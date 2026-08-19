@@ -163,9 +163,11 @@ function hash(str) {
   return h;
 }
 
-async function run() {
-  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/flowhcm";
-  await connectDb(uri);
+export async function seedDatabase({ disconnect = true } = {}) {
+  if (mongoose.connection.readyState !== 1) {
+    const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/flowhcm";
+    await connectDb(uri);
+  }
 
   const logFile = path.resolve(__dirname, "../../data/att-logs.txt");
   if (!fs.existsSync(logFile)) {
@@ -242,11 +244,17 @@ async function run() {
   );
 
   console.log(`Seeded ${employees.length} employees and ${allLogs.length} attendance punches`);
-  await mongoose.disconnect();
-  process.exit(0);
+  if (disconnect) {
+    await mongoose.disconnect();
+  }
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
+if (invoked && path.normalize(fileURLToPath(import.meta.url)) === path.normalize(invoked)) {
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

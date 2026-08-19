@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT) || 5000;
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: true,
     credentials: true,
   })
 );
@@ -50,22 +50,34 @@ app.use((err, _req, res, _next) => {
 
 await connectDb(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/flowhcm");
 
-app.listen(PORT, () => {
-  console.log(`Flow HCM API running on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL) {
+  const { Employee } = await import("./models/Employee.js");
+  if ((await Employee.countDocuments()) === 0) {
+    const { seedDatabase } = await import("./scripts/seed.js");
+    await seedDatabase({ disconnect: false });
+  }
+}
+
+export default app;
 
 process.on("unhandledRejection", (err) => {
   console.error("unhandledRejection", err);
 });
 
-if (process.env.ZK_AUTO_SYNC !== "false") {
-  const minutes = Number(process.env.ZK_SYNC_MINUTES) || 3;
-  setTimeout(() => {
-    syncMachines()
-      .then((r) => console.log("ZK first sync", JSON.stringify(r.machines.map((m) => ({ id: m.id, ok: m.ok, logs: m.logs, error: m.error })))))
-      .catch((err) => console.error("ZK first sync failed", err.message));
-  }, 4000);
-  setInterval(() => {
-    syncMachines().catch((err) => console.error("ZK sync failed", err.message));
-  }, minutes * 60 * 1000);
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Flow HCM API running on http://localhost:${PORT}`);
+  });
+
+  if (process.env.ZK_AUTO_SYNC !== "false") {
+    const minutes = Number(process.env.ZK_SYNC_MINUTES) || 3;
+    setTimeout(() => {
+      syncMachines()
+        .then((r) => console.log("ZK first sync", JSON.stringify(r.machines.map((m) => ({ id: m.id, ok: m.ok, logs: m.logs, error: m.error })))))
+        .catch((err) => console.error("ZK first sync failed", err.message));
+    }, 4000);
+    setInterval(() => {
+      syncMachines().catch((err) => console.error("ZK sync failed", err.message));
+    }, minutes * 60 * 1000);
+  }
 }

@@ -29,6 +29,29 @@ Agar aapke paas MongoDB Server already installed hai to `backend/.env` mein `USE
 
 `npm run seed` attendance logs (`backend/data/att-logs.txt`) MongoDB mein import karta hai. Punch type `1` = Check In, `0` = Check Out.
 
+## Vercel
+
+Repo root pe `vercel.json` hai (Vite frontend + Express `/api`). Import se pehle GitHub `main` latest honi chahiye.
+
+1. [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) pe free cluster banayein
+2. Database user + password set karein
+3. Network Access mein `0.0.0.0/0` allow karein (Vercel IPs change hoti hain)
+4. Connect string copy karein, `MONGO_URI` mein paste karein
+5. Vercel → Import `Muzzamil-javeed/hcm` → Application preset **Services** → Deploy
+6. Project → Settings → Environment Variables:
+
+```
+MONGO_URI=mongodb+srv://USER:PASS@cluster.mongodb.net/flowhcm
+JWT_SECRET=long-random-secret
+SESSION_SECRET=long-random-session-secret
+USE_EMBEDDED_MONGO=false
+ZK_AUTO_SYNC=false
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=Admin@123
+```
+
+Pehli API request empty database ko seed kar degi. Office ZK machines Vercel se nahi milengi (local network).
+
 ## Features
 
 - Login with Google (OAuth 2.0)
