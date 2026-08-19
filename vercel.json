@@ -8,19 +8,12 @@
     "backend": {
       "root": "backend/",
       "framework": "express",
-      "entrypoint": "src/index.js"
-    }
-  },
-  "experimentalServices": {
-    "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "backend": {
-      "entrypoint": "backend",
-      "routePrefix": "/api",
-      "framework": "express"
+      "entrypoint": "src/index.js",
+      "functions": {
+        "src/index.js": {
+          "excludeFiles": "{node_modules/mongodb-memory-server/**,node_modules/mongodb-memory-server-core/**,data/mongo/**}"
+        }
+      }
     }
   },
   "rewrites": [
