@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "seed": "node src/scripts/seed.js"
+    "seed": "node src/scripts/seed.js",
+    "import:employees": "node src/scripts/importEmployees.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
@@ -19,6 +20,7 @@
     "mongoose": "^8.8.1",
     "node-zklib": "^1.3.0",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "xlsx": "^0.18.5"
   }
 }

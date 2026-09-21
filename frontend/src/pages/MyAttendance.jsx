@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { App as AntApp, Alert, Button, Card, Col, DatePicker, Form, Input, Row, Select, Table, Tabs, Tag, Typography } from "antd";
 import api from "../api";
 
@@ -14,18 +14,91 @@ const STATUS = {
   rejected: "red",
 };
 
+const STATUS_COLOR = {
+  Present: "blue",
+  "Half Day": "orange",
+  Absent: "red",
+  OFF: "default",
+  Leave: "gold",
+  "Schedule Days": "default",
+  Missing: "magenta",
+};
+
+const WORKDAY_CUTOFF = "08:00:00";
+
 function to12h(time) {
-  if (!time) return "-";
-  const [h, m, s] = time.split(":").map(Number);
+  if (!time) return "—";
+  const [h, m, s] = String(time).split(":").map(Number);
   const ampm = h >= 12 ? "PM" : "AM";
   const hr = h % 12 || 12;
   return `${hr}:${String(m).padStart(2, "0")}:${String(s || 0).padStart(2, "0")} ${ampm}`;
+}
+
+function clockLabel(hours) {
+  const total = Math.max(0, Math.round((hours || 0) * 60));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function workDateFor(log) {
+  if ((log.time || "00:00:00") < WORKDAY_CUTOFF) return addDays(log.date, -1);
+  return log.date;
+}
+
+function formatDay(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2, "0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+function hoursBetween(checkIn, checkOut) {
+  if (!checkIn || !checkOut) return 0;
+  const [ih, im, is] = checkIn.split(":").map(Number);
+  const [oh, om, os] = checkOut.split(":").map(Number);
+  let start = ih * 60 + im + (is || 0) / 60;
+  let end = oh * 60 + om + (os || 0) / 60;
+  if (end < start) end += 24 * 60;
+  return Math.max(0, (end - start) / 60);
+}
+
+function daysFromLogs(logs) {
+  const map = new Map();
+  for (const log of logs) {
+    const workDate = workDateFor(log);
+    if (!map.has(workDate)) map.set(workDate, []);
+    map.get(workDate).push(log);
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([fullDate, punches]) => {
+      const sorted = [...punches].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+      const checkIn = sorted[0]?.time || null;
+      const checkOut = sorted.length > 1 ? sorted.at(-1).time : null;
+      const hours = Math.min(hoursBetween(checkIn, checkOut), 16);
+      return {
+        fullDate,
+        checkIn,
+        checkOut,
+        hours,
+        status: hours >= 9 ? "Present" : hours > 0 ? "Half Day" : "Absent",
+      };
+    });
 }
 
 export default function MyAttendance() {
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
   const [logs, setLogs] = useState([]);
+  const [days, setDays] = useState([]);
   const [balances, setBalances] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,14 +107,22 @@ export default function MyAttendance() {
   async function load() {
     setLoading(true);
     try {
-      const [{ data: logRes }, { data: b }, { data: r }] = await Promise.all([
-        api.get("/attendance/logs"),
-        api.get("/leaves/balances"),
-        api.get("/leaves"),
+      const logRes = await api.get("/attendance/logs").catch(() => ({ data: { logs: [] } }));
+      const logsList = logRes.data?.logs || [];
+      setLogs(logsList);
+      try {
+        const { data: dash } = await api.get("/dashboard/summary");
+        const chartDays = (dash.flagChart || []).filter((d) => d.status !== "Schedule Days").reverse();
+        setDays(chartDays.length ? chartDays : daysFromLogs(logsList));
+      } catch {
+        setDays(daysFromLogs(logsList));
+      }
+      const [{ data: b }, { data: r }] = await Promise.all([
+        api.get("/leaves/balances").catch(() => ({ data: { balances: [] } })),
+        api.get("/leaves").catch(() => ({ data: { requests: [] } })),
       ]);
-      setLogs(logRes.logs);
-      setBalances(b.balances);
-      setRequests(r.requests);
+      setBalances(b.balances || []);
+      setRequests(r.requests || []);
     } finally {
       setLoading(false);
     }
@@ -52,6 +133,19 @@ export default function MyAttendance() {
     const timer = setInterval(() => load().catch(() => {}), 20000);
     return () => clearInterval(timer);
   }, []);
+
+  const punchesByDay = useMemo(() => {
+    const map = new Map();
+    for (const log of logs) {
+      const workDate = workDateFor(log);
+      if (!map.has(workDate)) map.set(workDate, []);
+      map.get(workDate).push(log);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+    }
+    return map;
+  }, [logs]);
 
   async function onFinish(values) {
     setSaving(true);
@@ -79,24 +173,83 @@ export default function MyAttendance() {
         items={[
           {
             key: "logs",
-            label: "Punch Logs",
+            label: "Daily Attendance",
             children: (
               <Card className="soft-card">
+                <div className="punch-help">
+                  Har row ek office day hai (8:00 AM se next day 7:59 AM). Time In pehli punch, Time Out last punch.
+                </div>
                 <Table
-                  rowKey="_id"
+                  className="punch-daily"
+                  rowKey="fullDate"
                   loading={loading}
-                  dataSource={logs}
-                  pagination={{ pageSize: 12 }}
-                  columns={[
-                    { title: "Date", dataIndex: "date" },
-                    { title: "Time", dataIndex: "time", render: to12h },
-                    {
-                      title: "Type",
-                      dataIndex: "type",
-                      render: (t) => (t === 1 ? <Tag color="green">Check In</Tag> : <Tag color="red">Check Out</Tag>),
+                  dataSource={days}
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  expandable={{
+                    expandedRowRender: (row) => {
+                      const punches = punchesByDay.get(row.fullDate) || [];
+                      if (!punches.length) {
+                        return <div className="muted">Is din koi machine punch nahi mili.</div>;
+                      }
+                      return (
+                        <Table
+                          size="small"
+                          pagination={false}
+                          rowKey={(p) => p._id || `${p.date}-${p.time}`}
+                          dataSource={punches}
+                          columns={[
+                            { title: "Punch Time", dataIndex: "time", render: to12h, width: 160 },
+                            {
+                              title: "Type",
+                              dataIndex: "type",
+                              width: 120,
+                              render: (t) => (t === 1 ? <Tag color="green">Check In</Tag> : <Tag color="red">Check Out</Tag>),
+                            },
+                            { title: "Machine", dataIndex: "machineId", render: (v) => v || "—", width: 100 },
+                            { title: "IP", dataIndex: "ip", render: (v) => v || "—" },
+                          ]}
+                        />
+                      );
                     },
-                    { title: "Machine", dataIndex: "machineId", render: (v) => v || "-" },
-                    { title: "IP", dataIndex: "ip", render: (v) => v || "-" },
+                    rowExpandable: () => true,
+                  }}
+                  columns={[
+                    {
+                      title: "Date",
+                      dataIndex: "fullDate",
+                      render: formatDay,
+                      width: 200,
+                    },
+                    {
+                      title: "Time In",
+                      dataIndex: "checkIn",
+                      render: to12h,
+                      width: 150,
+                    },
+                    {
+                      title: "Time Out",
+                      dataIndex: "checkOut",
+                      render: to12h,
+                      width: 150,
+                    },
+                    {
+                      title: "Hours",
+                      dataIndex: "hours",
+                      render: clockLabel,
+                      width: 90,
+                    },
+                    {
+                      title: "Status",
+                      dataIndex: "status",
+                      width: 130,
+                      render: (s) => <Tag color={STATUS_COLOR[s] || "default"}>{s}</Tag>,
+                    },
+                    {
+                      title: "Punches",
+                      key: "punches",
+                      width: 90,
+                      render: (_, row) => punchesByDay.get(row.fullDate)?.length || 0,
+                    },
                   ]}
                 />
               </Card>

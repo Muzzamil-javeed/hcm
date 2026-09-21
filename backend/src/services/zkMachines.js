@@ -2,29 +2,81 @@ import { createRequire } from "module";
 import { AttendanceLog } from "../models/AttendanceLog.js";
 import { Employee } from "../models/Employee.js";
 import { LeaveBalance } from "../models/LeaveBalance.js";
+import { Device } from "../models/Device.js";
 import { todayStr } from "../utils/attendance.js";
 
 const require = createRequire(import.meta.url);
 const ZKLib = require("node-zklib");
 
 const DEFAULT_MACHINES = [
-  { id: "201", ip: "192.168.0.12", port: 4370 },
-  { id: "203", ip: "192.168.0.11", port: 4370 },
+  { id: "201", name: "Machine 201", ip: "192.168.0.12", port: 4370 },
+  { id: "203", name: "Machine 203", ip: "192.168.0.11", port: 4370 },
+  { id: "306", name: "Machine 306", ip: "192.168.0.13", port: 4370 },
 ];
 
-export function getMachines() {
+function envMachines() {
   const raw = process.env.ZK_MACHINES;
-  if (!raw) return DEFAULT_MACHINES;
+  if (!raw) return null;
   return raw.split(",").map((entry, i) => {
     const parts = entry.trim().split(":");
     if (parts.length === 3) {
-      return { id: parts[0], ip: parts[1], port: Number(parts[2]) || 4370 };
+      return { id: parts[0], name: `Machine ${parts[0]}`, ip: parts[1], port: Number(parts[2]) || 4370 };
     }
     if (parts.length === 2) {
-      return { id: String(201 + i), ip: parts[0], port: Number(parts[1]) || 4370 };
+      const id = String(201 + i);
+      return { id, name: `Machine ${id}`, ip: parts[0], port: Number(parts[1]) || 4370 };
     }
-    return { id: String(201 + i), ip: parts[0], port: 4370 };
+    const id = String(201 + i);
+    return { id, name: `Machine ${id}`, ip: parts[0], port: 4370 };
   });
+}
+
+let machineCache = null;
+
+export function getMachines() {
+  if (machineCache?.length) {
+    return machineCache.filter((m) => m.active !== false).map((m) => ({
+      id: m.id,
+      name: m.name,
+      ip: m.ip,
+      port: m.port,
+    }));
+  }
+  return (envMachines() || DEFAULT_MACHINES).map((m) => ({
+    id: m.id,
+    name: m.name,
+    ip: m.ip,
+    port: m.port,
+  }));
+}
+
+export async function ensureDevicesSeeded() {
+  const count = await Device.countDocuments();
+  if (count > 0) return;
+  const seed = envMachines() || DEFAULT_MACHINES;
+  await Device.insertMany(
+    seed.map((m) => ({
+      name: m.name || `Machine ${m.id}`,
+      deviceId: String(m.id),
+      ip: m.ip,
+      port: m.port || 4370,
+      active: true,
+    }))
+  );
+}
+
+export async function refreshMachineCache() {
+  await ensureDevicesSeeded();
+  const rows = await Device.find().sort({ deviceId: 1 }).lean();
+  machineCache = rows.map((d) => ({
+    id: d.deviceId,
+    name: d.name,
+    ip: d.ip,
+    port: d.port || 4370,
+    active: d.active !== false,
+    _id: d._id,
+  }));
+  return machineCache;
 }
 
 let lastSync = {
@@ -187,7 +239,24 @@ async function upsertEmployees(users, punches) {
   const ids = new Set([...fromDevice.keys(), ...punches.map((p) => p.empId)]);
   for (const empId of ids) {
     const deviceName = fromDevice.get(empId);
-    const name = empId === "112" ? "Muzamil Javed" : deviceName || `Employee ${empId}`;
+    const existing = await Employee.findOne({ empId }).lean();
+    if (existing?.source === "roster") {
+      await LeaveBalance.findOneAndUpdate(
+        { empId },
+        { $setOnInsert: { empId, casual: 10, annual: 14, sick: 8 } },
+        { upsert: true }
+      );
+      continue;
+    }
+    const placeholder = !existing?.name || /^Employee\s+/i.test(existing.name);
+    const name =
+      empId === "112"
+        ? existing?.name && !placeholder
+          ? existing.name
+          : "Muzamil Javed"
+        : !placeholder
+          ? existing.name
+          : deviceName || `Employee ${empId}`;
     await Employee.updateOne(
       { empId },
       {
@@ -195,8 +264,9 @@ async function upsertEmployees(users, punches) {
         $setOnInsert: {
           empId,
           jobTitle: empId === "112" ? "Senior Frontend Specialist" : "Employee",
-          department: empId === "112" ? "Engineering" : "Operations",
+          department: empId === "112" ? "Development" : "Operations",
           email: `${empId}@flowhcm.local`,
+          source: "device",
         },
       },
       { upsert: true }
@@ -210,6 +280,7 @@ async function upsertEmployees(users, punches) {
 }
 
 export async function syncMachines() {
+  await refreshMachineCache();
   const machines = getMachines();
   const reports = [];
   for (const machine of machines) {
@@ -220,6 +291,7 @@ export async function syncMachines() {
 }
 
 export async function pingMachines() {
+  await refreshMachineCache();
   const machines = getMachines();
   const reports = [];
   for (const machine of machines) {

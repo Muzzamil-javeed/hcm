@@ -50,11 +50,20 @@ app.use((err, _req, res, _next) => {
 
 await connectDb(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/flowhcm");
 
-if (process.env.VERCEL) {
+{
   const { Employee } = await import("./models/Employee.js");
-  if ((await Employee.countDocuments()) === 0) {
+  const { AttendanceLog } = await import("./models/AttendanceLog.js");
+  if ((await Employee.countDocuments()) === 0 && (await AttendanceLog.countDocuments()) === 0) {
     const { seedDatabase } = await import("./scripts/seed.js");
     await seedDatabase({ disconnect: false });
+  }
+  try {
+    const { importEmployeesFromExcel, defaultRosterPath } = await import("./scripts/importEmployees.js");
+    const roster = defaultRosterPath();
+    const result = await importEmployeesFromExcel(roster);
+    console.log(`Roster import: ${result.upserted} employees (total ${result.total})`);
+  } catch (err) {
+    console.warn("Roster import skipped:", err.message);
   }
 }
 

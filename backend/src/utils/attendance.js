@@ -192,3 +192,55 @@ export function hoursToClock(hours) {
   const m = total % 60;
   return `${h}:${String(m).padStart(2, "0")}`;
 }
+
+export function hoursToHms(hours) {
+  const totalSec = Math.max(0, Math.round((hours || 0) * 3600));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+const WEEK_NAMES = ["First Week", "Second Week", "Third Week", "Fourth Week", "Fifth Week", "Sixth Week"];
+
+export function weekIndexInMonth(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const firstDow = (first.getDay() + 6) % 7;
+  return Math.floor((d.getDate() - 1 + firstDow) / 7);
+}
+
+export function buildWeekChart(daily) {
+  const buckets = WEEK_NAMES.map((week) => ({
+    week,
+    description: "Working Hours",
+    scheduledHours: 0,
+    workedHours: 0,
+    weekdayCount: 0,
+  }));
+  let maxIdx = 0;
+  for (const day of daily) {
+    const idx = weekIndexInMonth(day.date);
+    if (idx < 0 || idx >= buckets.length) continue;
+    maxIdx = Math.max(maxIdx, idx);
+    const bucket = buckets[idx];
+    if (!isWeekend(day.date)) {
+      bucket.weekdayCount += 1;
+      bucket.scheduledHours += FULL_DAY_HOURS;
+    }
+    bucket.workedHours += day.hours || 0;
+  }
+  return buckets.slice(0, maxIdx + 1).map((bucket) => {
+    const averageHours = bucket.weekdayCount ? bucket.workedHours / bucket.weekdayCount : 0;
+    return {
+      week: bucket.week,
+      description: bucket.description,
+      scheduled: Number(bucket.scheduledHours.toFixed(4)),
+      worked: Number(bucket.workedHours.toFixed(4)),
+      average: Number(averageHours.toFixed(4)),
+      scheduledLabel: hoursToHms(bucket.scheduledHours),
+      workedLabel: hoursToHms(bucket.workedHours),
+      averageLabel: hoursToHms(averageHours),
+    };
+  });
+}

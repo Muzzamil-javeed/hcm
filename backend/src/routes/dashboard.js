@@ -7,6 +7,7 @@ import { authRequired } from "../middleware/auth.js";
 import {
   addDays,
   buildDailyRecords,
+  buildWeekChart,
   classifyDay,
   currentWorkDate,
   FLAG_COLORS,
@@ -96,6 +97,8 @@ router.get("/summary", authRequired, async (req, res) => {
     average: Number(averageHours.toFixed(2)),
   }));
 
+  const weekChart = buildWeekChart(daily);
+
   const flagChart = daily.map((d) => {
     const worked = Number((d.hours || 0).toFixed(2));
     const barHours =
@@ -155,6 +158,7 @@ router.get("/summary", authRequired, async (req, res) => {
     ],
     flagChart,
     hoursChart,
+    weekChart,
     totals: {
       scheduledHours: Number(scheduledHours.toFixed(2)),
       totalWorkHours: Number(totalWorkHours.toFixed(2)),

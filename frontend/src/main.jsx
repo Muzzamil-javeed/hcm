@@ -11,10 +11,34 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: "#5f6744",
-          colorBgLayout: "#f6f3e8",
-          borderRadius: 10,
-          fontFamily: `"Source Sans 3", "Segoe UI", sans-serif`,
+          colorPrimary: "#2563eb",
+          colorBgLayout: "#f1f5f9",
+          colorText: "#0f172a",
+          colorTextSecondary: "#64748b",
+          colorBorder: "#e2e8f0",
+          colorBgContainer: "#ffffff",
+          borderRadius: 8,
+          fontFamily: `"Plus Jakarta Sans", system-ui, sans-serif`,
+        },
+        components: {
+          Layout: {
+            headerBg: "#ffffff",
+            bodyBg: "#f1f5f9",
+            siderBg: "#0f172a",
+          },
+          Menu: {
+            darkItemBg: "#0f172a",
+            darkItemSelectedBg: "#2563eb",
+            darkItemHoverBg: "rgba(255,255,255,0.06)",
+          },
+          Table: {
+            headerBg: "#f8fafc",
+            headerColor: "#334155",
+            borderColor: "#e2e8f0",
+          },
+          Card: {
+            colorBgContainer: "#ffffff",
+          },
         },
       }}
     >

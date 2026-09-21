@@ -1,17 +1,24 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Alert, Button, Card, Form, Input, Tabs, Typography } from "antd";
-import { GoogleOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import { Alert, Button, Checkbox, Form, Input, Tabs } from "antd";
+import {
+  EyeInvisibleOutlined,
+  EyeTwoTone,
+  LockOutlined,
+  MailOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const { user, demoLogin, adminLogin } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState("employee");
   const qError = new URLSearchParams(window.location.search).get("error");
 
   if (user) {
-    return <Navigate to={user.isSuperAdmin ? "/admin/attendance" : "/dashboard"} replace />;
+    return <Navigate to={user.isSuperAdmin ? "/admin/dashboard" : "/dashboard"} replace />;
   }
 
   async function onEmployee(values) {
@@ -42,59 +49,132 @@ export default function Login() {
   }
 
   return (
-    <div className="login-page">
-      <Card className="login-card">
-        <Typography.Title level={2} style={{ marginBottom: 4, color: "#4a5235" }}>
-          softnox <span style={{ fontWeight: 500 }}>technologies</span>
-        </Typography.Title>
-        <Typography.Paragraph type="secondary">Employee self service and admin portal</Typography.Paragraph>
-        {(error || qError) && (
-          <Alert type="error" showIcon style={{ marginBottom: 16, textAlign: "left" }} message={error || "Google login failed"} />
-        )}
-        <Tabs
-          centered
-          items={[
-            {
-              key: "employee",
-              label: "Employee",
-              children: (
-                <Form layout="vertical" onFinish={onEmployee} style={{ textAlign: "left" }} initialValues={{ empId: "240" }}>
-                  <Form.Item
-                    name="empId"
-                    label="Employee Code"
-                    rules={[{ required: true, message: "Apna emp code likhein, e.g. 240" }]}
+    <div className="auth-shell">
+      <aside className="auth-hero">
+        <div className="auth-hero-glow auth-hero-glow-a" />
+        <div className="auth-hero-glow auth-hero-glow-b" />
+        <div className="auth-hero-glow auth-hero-glow-c" />
+        <div className="auth-hero-card auth-enter">
+          <p className="auth-hero-kicker">Softnox Technologies</p>
+          <h1>Empowering people through seamless HR management.</h1>
+          <div className="auth-hero-visual" aria-hidden>
+            <div className="auth-people">
+              <span className="p1" />
+              <span className="p2" />
+              <span className="p3" />
+            </div>
+            <div className="auth-desk" />
+          </div>
+          <p className="auth-hero-sub">
+            Efficiently manage your workforce, streamline attendance and operations effortlessly.
+          </p>
+        </div>
+      </aside>
+
+      <main className="auth-panel">
+        <div className="auth-panel-inner auth-enter" style={{ animationDelay: "80ms" }}>
+          <div className="auth-brand-row">
+            <span className="auth-brand-mark">S</span>
+            <b>Softnox Technologies</b>
+          </div>
+
+          <h2>Sign In</h2>
+          <p className="auth-lead">Please enter your details to sign in</p>
+
+          {(error || qError) && (
+            <Alert
+              type="error"
+              showIcon
+              className="auth-alert"
+              message={error || "Google login failed"}
+            />
+          )}
+
+          <Tabs
+            activeKey={mode}
+            onChange={setMode}
+            className="auth-tabs"
+            items={[
+              {
+                key: "employee",
+                label: "Employee",
+                children: (
+                  <Form
+                    layout="vertical"
+                    onFinish={onEmployee}
+                    initialValues={{ empId: "112", remember: true }}
+                    className="auth-form"
                   >
-                    <Input prefix={<UserOutlined />} placeholder="240" size="large" />
-                  </Form.Item>
-                  <Button block size="large" type="primary" htmlType="submit" loading={busy}>
-                    Open My Dashboard
-                  </Button>
-                  <Button block size="large" icon={<GoogleOutlined />} href="/api/auth/google" style={{ marginTop: 10 }}>
-                    Login with Google
-                  </Button>
-                </Form>
-              ),
-            },
-            {
-              key: "admin",
-              label: "Admin Portal",
-              children: (
-                <Form layout="vertical" onFinish={onAdmin} style={{ textAlign: "left" }}>
-                  <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-                    <Input prefix={<UserOutlined />} placeholder="admin" size="large" />
-                  </Form.Item>
-                  <Form.Item name="password" label="Password" rules={[{ required: true }]}>
-                    <Input.Password prefix={<LockOutlined />} placeholder="Password" size="large" />
-                  </Form.Item>
-                  <Button block size="large" type="primary" htmlType="submit" loading={busy}>
-                    Login as Super Admin
-                  </Button>
-                </Form>
-              ),
-            },
-          ]}
-        />
-      </Card>
+                    <Form.Item
+                      name="empId"
+                      label="Employee Code"
+                      rules={[{ required: true, message: "Apna emp code likhein" }]}
+                    >
+                      <Input
+                        size="large"
+                        placeholder="e.g. 112"
+                        suffix={<UserOutlined className="auth-field-icon" />}
+                      />
+                    </Form.Item>
+                    <div className="auth-row">
+                      <Form.Item name="remember" valuePropName="checked" noStyle>
+                        <Checkbox>Remember Me</Checkbox>
+                      </Form.Item>
+                      <button type="button" className="auth-link" tabIndex={-1}>
+                        Forgot Password?
+                      </button>
+                    </div>
+                    <Button block size="large" type="primary" htmlType="submit" loading={busy} className="auth-submit">
+                      Sign In
+                    </Button>
+                  </Form>
+                ),
+              },
+              {
+                key: "admin",
+                label: "Admin",
+                children: (
+                  <Form layout="vertical" onFinish={onAdmin} initialValues={{ remember: true }} className="auth-form">
+                    <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+                      <Input
+                        size="large"
+                        placeholder="admin"
+                        suffix={<MailOutlined className="auth-field-icon" />}
+                      />
+                    </Form.Item>
+                    <Form.Item name="password" label="Password" rules={[{ required: true }]}>
+                      <Input.Password
+                        size="large"
+                        placeholder="Password"
+                        iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+                        prefix={<LockOutlined className="auth-field-icon" />}
+                      />
+                    </Form.Item>
+                    <div className="auth-row">
+                      <Form.Item name="remember" valuePropName="checked" noStyle>
+                        <Checkbox>Remember Me</Checkbox>
+                      </Form.Item>
+                      <button type="button" className="auth-link" tabIndex={-1}>
+                        Forgot Password?
+                      </button>
+                    </div>
+                    <Button block size="large" type="primary" htmlType="submit" loading={busy} className="auth-submit">
+                      Sign In
+                    </Button>
+                  </Form>
+                ),
+              },
+            ]}
+          />
+
+          <p className="auth-switch">
+            Need help signing in?{" "}
+            <a href="mailto:hr@softnoxtechnologies.net">Contact HR</a>
+          </p>
+
+          <p className="auth-copy">Copyright © 2026 — Softnox Technologies</p>
+        </div>
+      </main>
     </div>
   );
 }

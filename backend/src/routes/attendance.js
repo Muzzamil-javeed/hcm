@@ -109,7 +109,7 @@ router.get("/logs", authRequired, async (req, res) => {
     if (from) filter.date.$gte = from;
     if (to) filter.date.$lte = to;
   }
-  const logs = await AttendanceLog.find(filter).sort({ punchedAt: -1, time: -1 }).limit(500);
+  const logs = await AttendanceLog.find(filter).sort({ punchedAt: -1, time: -1 }).limit(2000);
   res.json({ logs });
 });
 

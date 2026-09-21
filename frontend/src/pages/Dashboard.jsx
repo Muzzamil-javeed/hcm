@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { App as AntApp, Button, Card, Col, Row, Space, Table, Typography } from "antd";
-import { CalendarOutlined } from "@ant-design/icons";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarOutlined, LineChartOutlined } from "@ant-design/icons";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api from "../api";
 import { useAuth } from "../context/AuthContext";
 
@@ -20,9 +20,23 @@ const FLAG_LEGEND = [
   { label: "OFF", color: "#1f2527" },
 ];
 
+const WEEK_LEGEND = [
+  { label: "Total Schedule Hours", color: "#e74c3c" },
+  { label: "Total Work Hours", color: "#0076fa" },
+  { label: "Average Hours", color: "#fe9839" },
+];
+
 function clockLabel(hours) {
   const total = Math.max(0, Math.round((hours || 0) * 60));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function hoursToHms(hours) {
+  const totalSec = Math.max(0, Math.round((hours || 0) * 3600));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function to12h(time) {
@@ -31,6 +45,19 @@ function to12h(time) {
   const ampm = h >= 12 ? "PM" : "AM";
   const hr = h % 12 || 12;
   return `${hr}:${String(m).padStart(2, "0")}:${String(s || 0).padStart(2, "0")} ${ampm}`;
+}
+
+function WeekTip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="chart-tip">
+      <b>{label}</b>
+      <div>Scheduled: {d.scheduledLabel}</div>
+      <div>Worked: {d.workedLabel}</div>
+      <div>Average: {d.averageLabel}</div>
+    </div>
+  );
 }
 
 function ChartTip({ active, payload }) {
@@ -54,18 +81,24 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [todayPunch, setTodayPunch] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   async function load() {
-    const [{ data: summary }, { data: today }] = await Promise.all([
+    setLoadError("");
+    const [{ data: summary }, todayRes] = await Promise.all([
       api.get("/dashboard/summary"),
-      api.get("/attendance/today"),
+      api.get("/attendance/today").catch(() => ({ data: null })),
     ]);
     setData(summary);
-    setTodayPunch(today);
+    setTodayPunch(todayRes.data);
   }
 
   useEffect(() => {
-    load().catch((err) => message.error(err.response?.data?.message || "Dashboard load failed"));
+    load().catch((err) => {
+      const msg = err.response?.data?.message || "Dashboard load failed";
+      setLoadError(msg);
+      message.error(msg);
+    });
   }, []);
 
   async function punch(kind) {
@@ -81,7 +114,20 @@ export default function Dashboard() {
     }
   }
 
-  if (!data) return <Typography.Text>Loading dashboard...</Typography.Text>;
+  if (!data) {
+    return (
+      <div>
+        <Typography.Text>{loadError || "Loading dashboard..."}</Typography.Text>
+        {loadError ? (
+          <div style={{ marginTop: 12 }}>
+            <Button type="primary" onClick={() => load().catch((err) => setLoadError(err.response?.data?.message || "Dashboard load failed"))}>
+              Retry
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
   const emp = data.employee || {};
   const initials = (emp.name || user?.name || "U")
     .split(" ")
@@ -127,7 +173,7 @@ export default function Dashboard() {
             <div style={{ height: 320 }}>
               <ResponsiveContainer>
                 <BarChart data={data.flagChart} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="12%">
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6e2d6" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={52} />
                   <YAxis
                     domain={[0, 9.72]}
@@ -148,43 +194,88 @@ export default function Dashboard() {
         </Col>
 
         <Col xs={24} md={12}>
-          <Card className="soft-card">
-            <div className="sign-msg">
-              {todayPunch?.checkIn
-                ? `You signed in today at ${to12h(todayPunch.checkIn)}.`
-                : "You have not signed in today."}
+          <Card className="soft-card viz-card">
+            <div className="flag-head">
+              <div className="flag-title"><LineChartOutlined /> EMPLOYEE ATTENDANCE VISUALIZATION</div>
+              <div className="legend viz-legend">
+                {WEEK_LEGEND.map((l) => (
+                  <span key={l.label}><i style={{ background: l.color }} />{l.label}</span>
+                ))}
+              </div>
             </div>
-            {todayPunch?.checkOut && (
-              <div className="muted">Checked out at {to12h(todayPunch.checkOut)}</div>
-            )}
-            <div className="muted" style={{ marginTop: 8 }}>
-              Shift: {data.today?.shiftName || emp.shift || "Rotational"}
-              {todayPunch?.hours ? ` · Worked ${clockLabel(todayPunch.hours)}` : ""}
+            <div style={{ height: 280 }}>
+              <ResponsiveContainer>
+                <LineChart data={data.weekChart || []} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    domain={[0, 50]}
+                    ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]}
+                    tickFormatter={hoursToHms}
+                    tick={{ fontSize: 11 }}
+                    width={78}
+                  />
+                  <Tooltip content={<WeekTip />} />
+                  <Line type="monotone" dataKey="scheduled" name="Total Schedule Hours" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="worked" name="Total Work Hours" stroke="#0076fa" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="average" name="Average Hours" stroke="#fe9839" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <Space style={{ marginTop: 12 }}>
-              <Button type="primary" loading={busy} disabled={!todayPunch?.canCheckIn} onClick={() => punch("check-in")}>
-                Check In
-              </Button>
-              <Button loading={busy} disabled={!todayPunch?.canCheckOut} onClick={() => punch("check-out")}>
-                Check Out
-              </Button>
-            </Space>
+            <Table
+              className="viz-table"
+              size="small"
+              pagination={false}
+              rowKey="week"
+              dataSource={data.weekChart || []}
+              columns={[
+                { title: "Week", dataIndex: "week" },
+                { title: "Description", dataIndex: "description" },
+                { title: "Scheduled Hours", dataIndex: "scheduledLabel" },
+                { title: "Worked Hours", dataIndex: "workedLabel" },
+                { title: "Average Hours", dataIndex: "averageLabel" },
+              ]}
+            />
           </Card>
         </Col>
 
         <Col xs={24} md={12}>
-          <Card className="soft-card" title="Leave Summary">
-            <Table
-              size="small"
-              pagination={false}
-              rowKey="type"
-              dataSource={data.balances || []}
-              columns={[
-                { title: "Leave Type", dataIndex: "label" },
-                { title: "Balance", dataIndex: "balance", render: (v) => Number(v).toFixed(2) },
-              ]}
-            />
-          </Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Card className="soft-card" title="Leave Summary">
+              <Table
+                size="small"
+                pagination={false}
+                rowKey="type"
+                dataSource={data.balances || []}
+                columns={[
+                  { title: "Leave Type", dataIndex: "label" },
+                  { title: "Balance", dataIndex: "balance", render: (v) => Number(v).toFixed(2) },
+                ]}
+              />
+            </Card>
+            <Card className="soft-card">
+              <div className="sign-msg">
+                {todayPunch?.checkIn
+                  ? `You signed in today at ${to12h(todayPunch.checkIn)}.`
+                  : "You have not signed in today."}
+              </div>
+              {todayPunch?.checkOut && (
+                <div className="muted">Checked out at {to12h(todayPunch.checkOut)}</div>
+              )}
+              <div className="muted" style={{ marginTop: 8 }}>
+                Shift: {data.today?.shiftName || emp.shift || "Rotational"}
+                {todayPunch?.hours ? ` · Worked ${clockLabel(todayPunch.hours)}` : ""}
+              </div>
+              <Space style={{ marginTop: 12 }}>
+                <Button type="primary" loading={busy} disabled={!todayPunch?.canCheckIn} onClick={() => punch("check-in")}>
+                  Check In
+                </Button>
+                <Button loading={busy} disabled={!todayPunch?.canCheckOut} onClick={() => punch("check-out")}>
+                  Check Out
+                </Button>
+              </Space>
+            </Card>
+          </div>
         </Col>
       </Row>
     </div>
