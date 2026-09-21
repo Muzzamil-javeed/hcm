@@ -3,6 +3,7 @@ import { Employee } from "../models/Employee.js";
 import { AttendanceLog } from "../models/AttendanceLog.js";
 import { LeaveRequest } from "../models/LeaveRequest.js";
 import { LeaveBalance } from "../models/LeaveBalance.js";
+import { Announcement } from "../models/Announcement.js";
 import { authRequired } from "../middleware/auth.js";
 import {
   addDays,
@@ -14,7 +15,9 @@ import {
   formatDisplayDate,
   isWeekend,
   monthRange,
+  todayStr,
 } from "../utils/attendance.js";
+import { ensureEmployeeAssets } from "../utils/assets.js";
 
 const router = Router();
 
@@ -120,6 +123,23 @@ router.get("/summary", authRequired, async (req, res) => {
   const pendingLeaves = await LeaveRequest.countDocuments({ empId, status: "pending" });
   const recentLogs = await AttendanceLog.find({ empId }).sort({ punchedAt: -1 }).limit(25);
 
+  const teamName = employee?.team || "General";
+  const [announcements, teamMembers] = await Promise.all([
+    Announcement.find({ audience: { $in: ["all", "employees"] } })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .lean(),
+    Employee.find({
+      team: teamName,
+      empId: { $ne: empId },
+      $or: [{ source: "roster" }, { joiningDate: { $nin: ["", null] } }],
+    })
+      .sort({ name: 1 })
+      .limit(16)
+      .select("empId name jobTitle department team role")
+      .lean(),
+  ]);
+
   res.json({
     employee: employee
       ? {
@@ -170,6 +190,91 @@ router.get("/summary", authRequired, async (req, res) => {
     },
     flagColors: FLAG_COLORS,
     recentLogs,
+    announcements: announcements.map((a) => ({
+      id: a._id,
+      title: a.title,
+      body: a.body,
+      audience: a.audience,
+      createdBy: a.createdBy,
+      createdAt: a.createdAt,
+    })),
+    team: {
+      name: teamName,
+      members: teamMembers.map((m) => ({
+        empId: m.empId,
+        name: m.name,
+        jobTitle: m.jobTitle || "Employee",
+        department: m.department || "—",
+        role: m.role || "Member",
+      })),
+    },
+  });
+});
+
+function to12h(time) {
+  if (!time) return null;
+  const [h, m, s] = String(time).split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m).padStart(2, "0")}:${String(s || 0).padStart(2, "0")} ${ampm}`;
+}
+
+/** Logged-in employee: full profile + assets + leaves (read-only). */
+router.get("/profile", authRequired, async (req, res) => {
+  const empId = req.user.empId;
+  if (!empId || empId === "ADMIN") {
+    return res.status(400).json({ message: "Employee profile is only for staff accounts" });
+  }
+
+  const employee = await Employee.findOne({ empId }).lean();
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  const [balance, leaveStats, recentLeaves, todayLogs, assets] = await Promise.all([
+    LeaveBalance.findOneAndUpdate({ empId }, { $setOnInsert: { empId } }, { upsert: true, new: true }).lean(),
+    LeaveRequest.aggregate([
+      { $match: { empId } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    LeaveRequest.find({ empId }).sort({ createdAt: -1 }).limit(10).lean(),
+    AttendanceLog.find({
+      empId,
+      date: { $gte: addDays(todayStr(), -1), $lte: addDays(todayStr(), 1) },
+    })
+      .sort({ punchedAt: 1 })
+      .lean(),
+    ensureEmployeeAssets(employee),
+  ]);
+
+  const today = todayStr();
+  const todayClassified = classifyDay({
+    punches: todayLogs,
+    leave: null,
+    date: today,
+    empId,
+  });
+  const leaveCounts = Object.fromEntries(leaveStats.map((s) => [s._id, s.count]));
+
+  res.json({
+    employee,
+    today: {
+      date: today,
+      displayDate: formatDisplayDate(today),
+      ...todayClassified,
+      checkInLabel: to12h(todayClassified.checkIn),
+      checkOutLabel: to12h(todayClassified.checkOut),
+    },
+    balances: {
+      casual: Number(balance?.casual ?? 10),
+      annual: Number(balance?.annual ?? 14),
+      sick: Number(balance?.sick ?? 8),
+    },
+    leaveCounts: {
+      pending: leaveCounts.pending || 0,
+      approved: leaveCounts.approved || 0,
+      rejected: leaveCounts.rejected || 0,
+    },
+    recentLeaves,
+    assets,
   });
 });
 

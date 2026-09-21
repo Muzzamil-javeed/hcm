@@ -1,30 +1,64 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { App as AntApp, Button, Card, Col, Row, Space, Table, Typography } from "antd";
-import { CalendarOutlined, LineChartOutlined } from "@ant-design/icons";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { App as AntApp, Avatar, Button, Progress, Select, Spin, Table, Tag } from "antd";
+import {
+  CalendarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  LineChartOutlined,
+  NotificationOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import api from "../api";
 import { useAuth } from "../context/AuthContext";
 
 const FLAG_LEGEND = [
-  { label: "Present", color: "#0076fa" },
-  { label: "Late", color: "#F5C542" },
-  { label: "Early", color: "#7CB342" },
-  { label: "HalfDay", color: "#fe9839" },
-  { label: "Absent", color: "#ff001d" },
-  { label: "Short Day", color: "#FF8A65" },
-  { label: "Absent For Short Time", color: "#455A64" },
-  { label: "Leave", color: "#F0E68C" },
-  { label: "Sch Days", color: "#90A4AE" },
-  { label: "Missing", color: "#EC407A" },
-  { label: "OFF", color: "#1f2527" },
+  { label: "Present", color: "#2563eb" },
+  { label: "Late", color: "#f59e0b" },
+  { label: "Early", color: "#22c55e" },
+  { label: "Half Day", color: "#f97316" },
+  { label: "Absent", color: "#ef4444" },
+  { label: "Leave", color: "#a3e635" },
+  { label: "Missing", color: "#ec4899" },
+  { label: "OFF", color: "#475569" },
 ];
 
 const WEEK_LEGEND = [
-  { label: "Total Schedule Hours", color: "#e74c3c" },
-  { label: "Total Work Hours", color: "#0076fa" },
-  { label: "Average Hours", color: "#fe9839" },
+  { label: "Scheduled", color: "#ef4444" },
+  { label: "Worked", color: "#2563eb" },
+  { label: "Average", color: "#f97316" },
 ];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function initials(name = "") {
+  return name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "?";
+}
+
+function hashColor(id) {
+  const palette = ["#2563eb", "#db2777", "#0f766e", "#7c3aed", "#d97706", "#0891b2", "#16a34a"];
+  let hash = 0;
+  for (const ch of String(id || "")) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return palette[hash % palette.length];
+}
 
 function clockLabel(hours) {
   const total = Math.max(0, Math.round((hours || 0) * 60));
@@ -36,7 +70,7 @@ function hoursToHms(hours) {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s || 0).padStart(2, "0")}`;
 }
 
 function to12h(time) {
@@ -66,22 +100,34 @@ function ChartTip({ active, payload }) {
   return (
     <div className="chart-tip">
       <b>{d.fullDate}</b>
-      <div>TimeIn: {to12h(d.checkIn)}</div>
-      <div>TimeOut: {to12h(d.checkOut)}</div>
-      <div>TotalWorkedHrs: {clockLabel(d.hours)}</div>
+      <div>Check in: {to12h(d.checkIn)}</div>
+      <div>Check out: {to12h(d.checkOut)}</div>
+      <div>Worked: {clockLabel(d.hours)}</div>
       <div>Status: {d.status}</div>
-      <div>Shift: {d.shiftName || "—"}</div>
     </div>
   );
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { message } = AntApp.useApp();
   const [data, setData] = useState(null);
   const [todayPunch, setTodayPunch] = useState(null);
-  const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [chartMonth, setChartMonth] = useState("current");
+  const [flagChart, setFlagChart] = useState([]);
+  const [chartLoading, setChartLoading] = useState(false);
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const fmt = (d) => d.toLocaleString("en-US", { month: "long", year: "numeric" });
+    return [
+      { value: "current", label: `Current month · ${fmt(now)}` },
+      { value: "previous", label: `Previous month · ${fmt(prev)}` },
+    ];
+  }, []);
 
   async function load() {
     setLoadError("");
@@ -90,7 +136,32 @@ export default function Dashboard() {
       api.get("/attendance/today").catch(() => ({ data: null })),
     ]);
     setData(summary);
+    setFlagChart(summary.flagChart || []);
+    setChartMonth("current");
     setTodayPunch(todayRes.data);
+  }
+
+  async function loadFlagChart(mode) {
+    setChartMonth(mode);
+    if (mode === "current") {
+      setFlagChart(data?.flagChart || []);
+      return;
+    }
+    setChartLoading(true);
+    try {
+      const now = new Date();
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const { data: summary } = await api.get("/dashboard/summary", {
+        params: { year: prev.getFullYear(), month: prev.getMonth() + 1 },
+      });
+      setFlagChart(summary.flagChart || []);
+    } catch (err) {
+      message.error(err.response?.data?.message || "Could not load previous month");
+      setChartMonth("current");
+      setFlagChart(data?.flagChart || []);
+    } finally {
+      setChartLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -101,183 +172,316 @@ export default function Dashboard() {
     });
   }, []);
 
-  async function punch(kind) {
-    setBusy(true);
-    try {
-      const { data: res } = await api.post(`/attendance/${kind}`);
-      message.success(res.message);
-      await load();
-    } catch (err) {
-      message.error(err.response?.data?.message || "Punch failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const emp = data?.employee || {};
+  const firstName = (emp.name || user?.name || "there").split(" ")[0];
+  const summaryMap = useMemo(() => {
+    const m = {};
+    for (const s of data?.summary || []) m[s.label] = s.balance;
+    return m;
+  }, [data]);
 
   if (!data) {
     return (
-      <div>
-        <Typography.Text>{loadError || "Loading dashboard..."}</Typography.Text>
+      <div className="ed-boot">
         {loadError ? (
-          <div style={{ marginTop: 12 }}>
+          <>
+            <p>{loadError}</p>
             <Button type="primary" onClick={() => load().catch((err) => setLoadError(err.response?.data?.message || "Dashboard load failed"))}>
               Retry
             </Button>
-          </div>
-        ) : null}
+          </>
+        ) : (
+          <Spin size="large" />
+        )}
       </div>
     );
   }
-  const emp = data.employee || {};
-  const initials = (emp.name || user?.name || "U")
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+
+  const present = summaryMap.Present || 0;
+  const late = summaryMap.Late || 0;
+  const absent = summaryMap.Absent || 0;
+  const leave = summaryMap.Leave || 0;
+  const worked = data.totals?.totalWorkHours || 0;
+  const scheduled = data.totals?.scheduledHours || 0;
+  const workPct = scheduled ? Math.min(100, Math.round((worked / scheduled) * 100)) : 0;
 
   return (
-    <div>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={6}>
-          <Card className="soft-card profile-panel">
-            <div className="profile-pic">{initials}</div>
-            <Typography.Title level={4} style={{ marginBottom: 0 }}>
-              {emp.name} ({emp.empId})
-            </Typography.Title>
-            <div className="job">{emp.jobTitle}</div>
-            <div className="info-list">
-              <div><span>Employee ID</span><b>{emp.empId}</b></div>
-              <div><span>Department</span><b>{emp.department || "-"}</b></div>
-              <div><span>Shift</span><b>{emp.shift || "Rotational"}</b></div>
-            </div>
-          </Card>
-        </Col>
+    <div className="ed-dash">
+      <section className="ed-hero ed-enter">
+        <div>
+          <h1>
+            {greeting()}, {firstName}! <span aria-hidden>👋</span>
+          </h1>
+          <p>Here&apos;s your Softnox attendance snapshot for this month.</p>
+        </div>
+      </section>
 
-        <Col xs={24} xl={18}>
-          <Card className="soft-card flag-card">
-            <div className="flag-head">
-              <div className="flag-title"><CalendarOutlined /> ATTENDANCE FLAG SUMMARY</div>
-              <div className="flag-actions">
-                <Link className="flag-link" to="/attendance">View Attendance Detail</Link>
-                <span className="flag-pill">{emp.name} ({emp.empId})</span>
-                <span className="flag-pill">Total Worked Hours</span>
-                <span className="flag-pill">Current Month</span>
-              </div>
+      <section className="ed-kpis">
+        {[
+          { label: "Present", value: present, icon: <CheckCircleOutlined />, tone: "green" },
+          { label: "Late", value: late, icon: <ClockCircleOutlined />, tone: "amber" },
+          { label: "Absent", value: absent, icon: <CloseCircleOutlined />, tone: "red" },
+          { label: "On leave", value: leave, icon: <CalendarOutlined />, tone: "blue" },
+          { label: "Hours worked", value: clockLabel(worked), icon: <LineChartOutlined />, tone: "navy", hint: `${workPct}% of schedule` },
+        ].map((k, i) => (
+          <article key={k.label} className={`ed-kpi tone-${k.tone} ed-enter`} style={{ animationDelay: `${50 + i * 45}ms` }}>
+            <div className="ed-kpi-icon">{k.icon}</div>
+            <div>
+              <span>{k.label}</span>
+              <strong>{k.value}</strong>
+              {k.hint ? <small>{k.hint}</small> : <small>this month</small>}
             </div>
-            <div className="legend flag-legend">
-              {FLAG_LEGEND.map((l) => (
-                <span key={l.label}><i style={{ background: l.color }} />{l.label}</span>
-              ))}
-            </div>
-            <div style={{ height: 320 }}>
-              <ResponsiveContainer>
-                <BarChart data={data.flagChart} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="12%">
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={52} />
-                  <YAxis
-                    domain={[0, 9.72]}
-                    ticks={[0, 1.38, 2.77, 4.17, 5.55, 6.93, 8.33, 9.72]}
-                    tickFormatter={clockLabel}
-                    tick={{ fontSize: 11 }}
-                  />
-                  <Tooltip content={<ChartTip />} />
-                  <Bar dataKey="barHours" maxBarSize={36} radius={[3, 3, 0, 0]}>
-                    {data.flagChart.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </Col>
+          </article>
+        ))}
+      </section>
 
-        <Col xs={24} md={12}>
-          <Card className="soft-card viz-card">
-            <div className="flag-head">
-              <div className="flag-title"><LineChartOutlined /> EMPLOYEE ATTENDANCE VISUALIZATION</div>
-              <div className="legend viz-legend">
-                {WEEK_LEGEND.map((l) => (
+      <section className="ed-flags-row">
+        <aside className="ed-profile ed-enter" style={{ animationDelay: "280ms" }}>
+          <button
+            type="button"
+            className="ed-dp-btn"
+            title="Open My Info"
+            onClick={() => navigate("/info")}
+          >
+            <Avatar size={72} style={{ background: hashColor(emp.empId), fontSize: 26 }}>
+              {initials(emp.name || user?.name)}
+            </Avatar>
+          </button>
+          <h2>{emp.name || user?.name}</h2>
+          <Tag className="ed-role-tag">{emp.jobTitle || "Employee"}</Tag>
+          <ul className="ed-info">
+            <li><span>Employee ID</span><b>{emp.empId}</b></li>
+            <li><span>Department</span><b>{emp.department || "—"}</b></li>
+            <li><span>Team</span><b>{emp.team || "—"}</b></li>
+            <li><span>Shift</span><b>{emp.shift || data.today?.shiftName || "—"}</b></li>
+          </ul>
+        </aside>
+
+        <article className="ed-panel ed-flags ed-enter" style={{ animationDelay: "320ms" }}>
+          <header className="ed-panel-head ed-panel-head-wrap">
+            <div>
+              <h3><CalendarOutlined /> Attendance {chartMonth === "previous" ? "last month" : "this month"}</h3>
+              <p className="muted">Daily status flags · hover a bar for punch details</p>
+            </div>
+            <div className="ed-flags-tools">
+              <Select
+                className="ed-month-select"
+                value={chartMonth}
+                options={monthOptions}
+                onChange={loadFlagChart}
+                popupMatchSelectWidth={false}
+              />
+              <div className="ed-legend">
+                {FLAG_LEGEND.map((l) => (
                   <span key={l.label}><i style={{ background: l.color }} />{l.label}</span>
                 ))}
               </div>
             </div>
-            <div style={{ height: 280 }}>
-              <ResponsiveContainer>
-                <LineChart data={data.weekChart || []} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    domain={[0, 50]}
-                    ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]}
-                    tickFormatter={hoursToHms}
-                    tick={{ fontSize: 11 }}
-                    width={78}
-                  />
-                  <Tooltip content={<WeekTip />} />
-                  <Line type="monotone" dataKey="scheduled" name="Total Schedule Hours" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="worked" name="Total Work Hours" stroke="#0076fa" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="average" name="Average Hours" stroke="#fe9839" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <Table
-              className="viz-table"
-              size="small"
-              pagination={false}
-              rowKey="week"
-              dataSource={data.weekChart || []}
-              columns={[
-                { title: "Week", dataIndex: "week" },
-                { title: "Description", dataIndex: "description" },
-                { title: "Scheduled Hours", dataIndex: "scheduledLabel" },
-                { title: "Worked Hours", dataIndex: "workedLabel" },
-                { title: "Average Hours", dataIndex: "averageLabel" },
-              ]}
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} md={12}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Card className="soft-card" title="Leave Summary">
-              <Table
-                size="small"
-                pagination={false}
-                rowKey="type"
-                dataSource={data.balances || []}
-                columns={[
-                  { title: "Leave Type", dataIndex: "label" },
-                  { title: "Balance", dataIndex: "balance", render: (v) => Number(v).toFixed(2) },
-                ]}
-              />
-            </Card>
-            <Card className="soft-card">
-              <div className="sign-msg">
-                {todayPunch?.checkIn
-                  ? `You signed in today at ${to12h(todayPunch.checkIn)}.`
-                  : "You have not signed in today."}
-              </div>
-              {todayPunch?.checkOut && (
-                <div className="muted">Checked out at {to12h(todayPunch.checkOut)}</div>
-              )}
-              <div className="muted" style={{ marginTop: 8 }}>
-                Shift: {data.today?.shiftName || emp.shift || "Rotational"}
-                {todayPunch?.hours ? ` · Worked ${clockLabel(todayPunch.hours)}` : ""}
-              </div>
-              <Space style={{ marginTop: 12 }}>
-                <Button type="primary" loading={busy} disabled={!todayPunch?.canCheckIn} onClick={() => punch("check-in")}>
-                  Check In
-                </Button>
-                <Button loading={busy} disabled={!todayPunch?.canCheckOut} onClick={() => punch("check-out")}>
-                  Check Out
-                </Button>
-              </Space>
-            </Card>
+          </header>
+          <div className={`ed-chart tall${chartLoading ? " is-loading" : ""}`}>
+            {chartLoading && (
+              <div className="ed-chart-spin"><Spin size="small" /></div>
+            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={flagChart} margin={{ top: 8, right: 8, left: 0, bottom: 8 }} barCategoryGap="12%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} interval={0} angle={-35} textAnchor="end" height={52} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={[0, 9.72]}
+                  ticks={[0, 1.38, 2.77, 4.17, 5.55, 6.93, 8.33, 9.72]}
+                  tickFormatter={clockLabel}
+                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(37,99,235,0.06)" }} />
+                <Bar dataKey="barHours" maxBarSize={28} radius={[6, 6, 0, 0]}>
+                  {flagChart.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </Col>
-      </Row>
+        </article>
+      </section>
+
+      <section className="ed-mid">
+        <article className="ed-panel ed-punch ed-enter" style={{ animationDelay: "360ms" }}>
+          <header className="ed-panel-head">
+            <h3>Today&apos;s punch</h3>
+            <span className="muted">{data.today?.displayDate || "Today"}</span>
+          </header>
+          <div className="ed-punch-status">
+            {todayPunch?.checkIn ? (
+              <p>
+                Signed in at <b>{to12h(todayPunch.checkIn)}</b>
+                {todayPunch?.checkOut ? <> · Out at <b>{to12h(todayPunch.checkOut)}</b></> : null}
+              </p>
+            ) : (
+              <p>You haven&apos;t signed in yet today.</p>
+            )}
+            <small>
+              Shift: {data.today?.shiftName || emp.shift || "Rotational"}
+              {todayPunch?.hours ? ` · Worked ${clockLabel(todayPunch.hours)}` : ""}
+            </small>
+          </div>
+          <div className="ed-work-meter" style={{ marginTop: 16 }}>
+            <div className="ed-work-meter-top">
+              <span>Month progress</span>
+              <b>{clockLabel(worked)} / {clockLabel(scheduled)}</b>
+            </div>
+            <Progress percent={workPct} showInfo={false} strokeColor="#2563eb" trailColor="#e2e8f0" />
+          </div>
+        </article>
+
+        <article className="ed-panel ed-leaves ed-enter" style={{ animationDelay: "400ms" }}>
+          <header className="ed-panel-head">
+            <h3>Leave balances</h3>
+            <TeamOutlined className="muted" />
+          </header>
+          <ul className="ed-leave-list">
+            {(data.balances || []).map((b) => (
+              <li key={b.type}>
+                <div>
+                  <b>{b.label}</b>
+                  <Progress
+                    percent={Math.min(100, (Number(b.balance) / 14) * 100)}
+                    showInfo={false}
+                    size="small"
+                    strokeColor={b.type === "sick" ? "#f59e0b" : b.type === "annual" ? "#7c3aed" : "#2563eb"}
+                    trailColor="#eef2f7"
+                  />
+                </div>
+                <em>{Number(b.balance).toFixed(1)}</em>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
+
+      <section className="ed-feed-row">
+        <article className="ed-panel ed-news ed-enter" style={{ animationDelay: "420ms" }}>
+          <header className="ed-panel-head">
+            <h3><NotificationOutlined /> Announcements</h3>
+            <span className="muted">{(data.announcements || []).length} posts</span>
+          </header>
+          <ul className="ed-news-list">
+            {(data.announcements || []).length === 0 && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>No announcements yet.</li>
+            )}
+            {(data.announcements || []).slice(0, 5).map((a) => (
+              <li key={a.id}>
+                <span className={`ed-news-dot tone-${a.audience === "employees" ? "green" : "blue"}`} />
+                <div>
+                  <b>{a.title}</b>
+                  <p>{a.body}</p>
+                  <small>
+                    {a.createdAt ? new Date(a.createdAt).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                    {a.createdBy ? ` · ${a.createdBy}` : ""}
+                  </small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </article>
+
+        <article className="ed-panel ed-team ed-enter" style={{ animationDelay: "460ms" }}>
+          <header className="ed-panel-head">
+            <h3><TeamOutlined /> My team</h3>
+            <span className="muted">{data.team?.name || emp.team || "—"} · {(data.team?.members || []).length}</span>
+          </header>
+          <ul className="ed-team-list">
+            {(data.team?.members || []).length === 0 && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>No other members in your team.</li>
+            )}
+            {(data.team?.members || []).map((m) => (
+              <li key={m.empId}>
+                <Avatar size={36} style={{ background: hashColor(m.empId), flexShrink: 0 }}>
+                  {initials(m.name)}
+                </Avatar>
+                <div className="ed-team-copy">
+                  <b>{m.name}</b>
+                  <small>{m.jobTitle} · Emp {m.empId}</small>
+                </div>
+                <Tag className={`ed-team-role ${(m.role || "member").toLowerCase()}`}>{m.role || "Member"}</Tag>
+              </li>
+            ))}
+          </ul>
+          <p className="ed-team-hint">View only</p>
+        </article>
+      </section>
+
+      <section className="ed-bottom">
+        <article className="ed-panel ed-enter" style={{ animationDelay: "500ms" }}>
+          <header className="ed-panel-head ed-panel-head-wrap">
+            <div>
+              <h3><LineChartOutlined /> Weekly hours</h3>
+              <p className="muted">Scheduled vs worked vs average</p>
+            </div>
+            <div className="ed-legend">
+              {WEEK_LEGEND.map((l) => (
+                <span key={l.label}><i style={{ background: l.color }} />{l.label}</span>
+              ))}
+            </div>
+          </header>
+          <div className="ed-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.weekChart || []} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={[0, 50]}
+                  ticks={[0, 10, 20, 30, 40, 50]}
+                  tickFormatter={hoursToHms}
+                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  width={70}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<WeekTip />} />
+                <Line type="monotone" dataKey="scheduled" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }} />
+                <Line type="monotone" dataKey="worked" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: "#2563eb", strokeWidth: 0 }} />
+                <Line type="monotone" dataKey="average" stroke="#f97316" strokeWidth={2.5} dot={{ r: 3, fill: "#f97316", strokeWidth: 0 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <Table
+            className="ed-week-table"
+            size="small"
+            pagination={false}
+            rowKey="week"
+            dataSource={data.weekChart || []}
+            columns={[
+              { title: "Week", dataIndex: "week" },
+              { title: "Range", dataIndex: "description", ellipsis: true },
+              { title: "Scheduled", dataIndex: "scheduledLabel" },
+              { title: "Worked", dataIndex: "workedLabel" },
+              { title: "Average", dataIndex: "averageLabel" },
+            ]}
+          />
+        </article>
+
+        <article className="ed-panel ed-enter" style={{ animationDelay: "520ms" }}>
+          <header className="ed-panel-head">
+            <h3>Needs attention</h3>
+          </header>
+          <ul className="ed-miss-list">
+            {(data.missing || []).length === 0 && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>All clear — no missing days.</li>
+            )}
+            {(data.missing || []).slice(0, 8).map((m) => (
+              <li key={m.date}>
+                <div>
+                  <b>{m.label || m.date}</b>
+                  <small>{m.date}</small>
+                </div>
+                <Tag className="ed-miss-tag">{m.status}</Tag>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
     </div>
   );
 }

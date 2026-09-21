@@ -4,7 +4,7 @@ import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import MyAttendance from "./pages/MyAttendance";
+import MyInfo from "./pages/MyInfo";
 import AdminAttendance from "./pages/AdminAttendance";
 import AdminLeaves from "./pages/AdminLeaves";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -78,13 +78,17 @@ export default function App() {
         />
         <Route
           path="attendance"
+          element={<Navigate to="/dashboard" replace />}
+        />
+        <Route
+          path="info"
           element={
             <EmployeeGuard>
-              <MyAttendance />
+              <MyInfo />
             </EmployeeGuard>
           }
         />
-        <Route path="leave" element={<Navigate to="/attendance" replace />} />
+        <Route path="leave" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="admin"
           element={

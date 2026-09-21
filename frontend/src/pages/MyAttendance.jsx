@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { App as AntApp, Alert, Button, Card, Col, DatePicker, Form, Input, Row, Select, Table, Tabs, Tag, Typography } from "antd";
+import { Link } from "react-router-dom";
+import {
+  App as AntApp,
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Progress,
+  Select,
+  Spin,
+  Table,
+  Tag,
+} from "antd";
+import {
+  CalendarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import api from "../api";
 
 const TYPES = [
@@ -8,20 +27,16 @@ const TYPES = [
   { value: "sick", label: "Sick Leave" },
 ];
 
-const STATUS = {
-  pending: "gold",
-  approved: "green",
-  rejected: "red",
-};
-
-const STATUS_COLOR = {
-  Present: "blue",
-  "Half Day": "orange",
-  Absent: "red",
-  OFF: "default",
-  Leave: "gold",
-  "Schedule Days": "default",
-  Missing: "magenta",
+const STATUS_CLASS = {
+  Present: "present",
+  Late: "late",
+  Early: "early",
+  "Half Day": "half",
+  Absent: "absent",
+  OFF: "off",
+  Leave: "leave",
+  Missing: "missing",
+  "Schedule Days": "off",
 };
 
 const WORKDAY_CUTOFF = "08:00:00";
@@ -103,6 +118,7 @@ export default function MyAttendance() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState("logs");
 
   async function load() {
     setLoading(true);
@@ -147,6 +163,15 @@ export default function MyAttendance() {
     return map;
   }, [logs]);
 
+  const stats = useMemo(() => {
+    const s = { Present: 0, Late: 0, Absent: 0, Leave: 0, "Half Day": 0, OFF: 0 };
+    for (const d of days) {
+      if (s[d.status] != null) s[d.status] += 1;
+      else if (d.status === "Early") s.Present += 1;
+    }
+    return s;
+  }, [days]);
+
   async function onFinish(values) {
     setSaving(true);
     try {
@@ -159,6 +184,7 @@ export default function MyAttendance() {
       message.success("Leave request submitted");
       form.resetFields();
       await load();
+      setTab("leaves");
     } catch (err) {
       message.error(err.response?.data?.message || "Could not apply leave");
     } finally {
@@ -166,153 +192,201 @@ export default function MyAttendance() {
     }
   }
 
+  if (loading && !days.length) {
+    return (
+      <div className="ma-boot">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <Typography.Title level={4}>My Attendance</Typography.Title>
-      <Tabs
-        items={[
-          {
-            key: "logs",
-            label: "Daily Attendance",
-            children: (
-              <Card className="soft-card">
-                <div className="punch-help">
-                  Har row ek office day hai (8:00 AM se next day 7:59 AM). Time In pehli punch, Time Out last punch.
-                </div>
-                <Table
-                  className="punch-daily"
-                  rowKey="fullDate"
-                  loading={loading}
-                  dataSource={days}
-                  pagination={{ pageSize: 10, showSizeChanger: false }}
-                  expandable={{
-                    expandedRowRender: (row) => {
-                      const punches = punchesByDay.get(row.fullDate) || [];
-                      if (!punches.length) {
-                        return <div className="muted">Is din koi machine punch nahi mili.</div>;
-                      }
-                      return (
-                        <Table
-                          size="small"
-                          pagination={false}
-                          rowKey={(p) => p._id || `${p.date}-${p.time}`}
-                          dataSource={punches}
-                          columns={[
-                            { title: "Punch Time", dataIndex: "time", render: to12h, width: 160 },
-                            {
-                              title: "Type",
-                              dataIndex: "type",
-                              width: 120,
-                              render: (t) => (t === 1 ? <Tag color="green">Check In</Tag> : <Tag color="red">Check Out</Tag>),
-                            },
-                            { title: "Machine", dataIndex: "machineId", render: (v) => v || "—", width: 100 },
-                            { title: "IP", dataIndex: "ip", render: (v) => v || "—" },
-                          ]}
-                        />
-                      );
-                    },
-                    rowExpandable: () => true,
-                  }}
-                  columns={[
-                    {
-                      title: "Date",
-                      dataIndex: "fullDate",
-                      render: formatDay,
-                      width: 200,
-                    },
-                    {
-                      title: "Time In",
-                      dataIndex: "checkIn",
-                      render: to12h,
-                      width: 150,
-                    },
-                    {
-                      title: "Time Out",
-                      dataIndex: "checkOut",
-                      render: to12h,
-                      width: 150,
-                    },
-                    {
-                      title: "Hours",
-                      dataIndex: "hours",
-                      render: clockLabel,
-                      width: 90,
-                    },
-                    {
-                      title: "Status",
-                      dataIndex: "status",
-                      width: 130,
-                      render: (s) => <Tag color={STATUS_COLOR[s] || "default"}>{s}</Tag>,
-                    },
-                    {
-                      title: "Punches",
-                      key: "punches",
-                      width: 90,
-                      render: (_, row) => punchesByDay.get(row.fullDate)?.length || 0,
-                    },
-                  ]}
+    <div className="ma-page">
+      <section className="ma-hero ma-enter">
+        <div>
+          <h1><CalendarOutlined /> My Attendance</h1>
+          <p>Daily punches, hours, and leave requests — Softnox workday (8:00 AM cutoff)</p>
+        </div>
+        <Link to="/info" className="ma-hero-link">My Info →</Link>
+      </section>
+
+      <section className="ma-kpis">
+        {[
+          { label: "Present", value: stats.Present, tone: "green", icon: <CheckCircleOutlined /> },
+          { label: "Late", value: stats.Late, tone: "amber", icon: <ClockCircleOutlined /> },
+          { label: "Half day", value: stats["Half Day"], tone: "orange", icon: <ClockCircleOutlined /> },
+          { label: "Absent", value: stats.Absent, tone: "red", icon: <CloseCircleOutlined /> },
+          { label: "On leave", value: stats.Leave, tone: "blue", icon: <CalendarOutlined /> },
+        ].map((k, i) => (
+          <article key={k.label} className={`ma-kpi tone-${k.tone} ma-enter`} style={{ animationDelay: `${40 + i * 40}ms` }}>
+            <div className="ma-kpi-icon">{k.icon}</div>
+            <div>
+              <span>{k.label}</span>
+              <strong>{k.value}</strong>
+              <small>this month</small>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <div className="ma-tabs ma-enter" style={{ animationDelay: "180ms" }}>
+        <button type="button" className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}>
+          Daily Attendance <em>{days.length}</em>
+        </button>
+        <button type="button" className={tab === "leaves" ? "active" : ""} onClick={() => setTab("leaves")}>
+          Leaves <em>{requests.length}</em>
+        </button>
+      </div>
+
+      {tab === "logs" && (
+        <section className="ma-panel ma-enter" key="logs" style={{ animationDelay: "220ms" }}>
+          <div className="ma-note">
+            <i />
+            <span>
+              Har row ek office day hai (8:00 AM se next day 7:59 AM). Time In pehli punch, Time Out last punch.
+              Row expand karke saari machine punches dekho.
+            </span>
+          </div>
+          <Table
+            className="emp-table soft-card ma-table"
+            rowKey="fullDate"
+            loading={loading}
+            dataSource={days}
+            pagination={{ pageSize: 12, showSizeChanger: false, showTotal: (t) => `${t} days` }}
+            expandable={{
+              expandedRowRender: (row) => {
+                const punches = punchesByDay.get(row.fullDate) || [];
+                if (!punches.length) {
+                  return <div className="ma-empty-expand">Is din koi machine punch nahi mili.</div>;
+                }
+                return (
+                  <div className="ma-punches">
+                    {punches.map((p) => (
+                      <div key={p._id || `${p.date}-${p.time}`} className="ma-punch-chip">
+                        <Tag className={p.type === 1 ? "ma-tag in" : "ma-tag out"}>
+                          {p.type === 1 ? "Check In" : "Check Out"}
+                        </Tag>
+                        <b>{to12h(p.time)}</b>
+                        <small>Machine {p.machineId || "—"} · {p.ip || "—"}</small>
+                      </div>
+                    ))}
+                  </div>
+                );
+              },
+              rowExpandable: () => true,
+            }}
+            columns={[
+              {
+                title: "Date",
+                dataIndex: "fullDate",
+                render: (d) => <span className="ma-date">{formatDay(d)}</span>,
+                width: 200,
+              },
+              { title: "Time In", dataIndex: "checkIn", render: to12h, width: 140 },
+              { title: "Time Out", dataIndex: "checkOut", render: to12h, width: 140 },
+              {
+                title: "Hours",
+                dataIndex: "hours",
+                width: 90,
+                render: (h) => <b className="ma-hours">{clockLabel(h)}</b>,
+              },
+              {
+                title: "Status",
+                dataIndex: "status",
+                width: 130,
+                render: (s) => <Tag className={`ma-status ${STATUS_CLASS[s] || "off"}`}>{s}</Tag>,
+              },
+              {
+                title: "Punches",
+                key: "punches",
+                width: 90,
+                render: (_, row) => (
+                  <span className="ma-punch-count">{punchesByDay.get(row.fullDate)?.length || 0}</span>
+                ),
+              },
+            ]}
+          />
+        </section>
+      )}
+
+      {tab === "leaves" && (
+        <div className="ma-leaves ma-enter" key="leaves" style={{ animationDelay: "220ms" }}>
+          {requests.some((r) => r.status === "approved") && (
+            <div className="ma-alert ok">
+              <CheckCircleOutlined /> Admin ne leave approve kar di hai
+            </div>
+          )}
+
+          <div className="ma-bal-grid">
+            {balances.map((b) => (
+              <article key={b.type} className="ma-bal">
+                <span>{b.label}</span>
+                <strong>{Number(b.balance).toFixed(1)}</strong>
+                <Progress
+                  percent={Math.min(100, (Number(b.balance) / (b.type === "annual" ? 14 : b.type === "sick" ? 8 : 10)) * 100)}
+                  showInfo={false}
+                  size="small"
+                  strokeColor={b.type === "sick" ? "#f59e0b" : b.type === "annual" ? "#7c3aed" : "#2563eb"}
+                  trailColor="#eef2f7"
                 />
-              </Card>
-            ),
-          },
-          {
-            key: "leaves",
-            label: "Leaves",
-            children: (
-              <>
-                {requests.some((r) => r.status === "approved") && (
-                  <Alert type="success" showIcon style={{ marginBottom: 16 }} message="Admin ne leave approve kar di hai" />
-                )}
-                <Row gutter={[16, 16]}>
-                  {balances.map((b) => (
-                    <Col xs={24} md={8} key={b.type}>
-                      <Card className="soft-card"><b>{b.label}</b><div>{Number(b.balance).toFixed(2)}</div></Card>
-                    </Col>
-                  ))}
-                  <Col xs={24} lg={10}>
-                    <Card className="soft-card" title="Apply Leave">
-                      <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ type: "casual" }}>
-                        <Form.Item name="type" label="Leave Type" rules={[{ required: true }]}>
-                          <Select options={TYPES} />
-                        </Form.Item>
-                        <Form.Item name="range" label="From / To" rules={[{ required: true }]}>
-                          <DatePicker.RangePicker style={{ width: "100%" }} />
-                        </Form.Item>
-                        <Form.Item name="reason" label="Reason">
-                          <Input.TextArea rows={3} />
-                        </Form.Item>
-                        <Button type="primary" htmlType="submit" loading={saving}>Submit Leave</Button>
-                      </Form>
-                    </Card>
-                  </Col>
-                  <Col xs={24} lg={14}>
-                    <Card className="soft-card" title="My Leave Requests">
-                      <Table
-                        rowKey="_id"
-                        loading={loading}
-                        dataSource={requests}
-                        pagination={{ pageSize: 8 }}
-                        columns={[
-                          { title: "Type", dataIndex: "type", render: (v) => v?.[0]?.toUpperCase() + v?.slice(1) },
-                          { title: "From", dataIndex: "fromDate" },
-                          { title: "To", dataIndex: "toDate" },
-                          { title: "Days", dataIndex: "days" },
-                          { title: "Reason", dataIndex: "reason", ellipsis: true },
-                          {
-                            title: "Status",
-                            dataIndex: "status",
-                            render: (s) => <Tag color={STATUS[s] || "default"}>{s}</Tag>,
-                          },
-                        ]}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-              </>
-            ),
-          },
-        ]}
-      />
+              </article>
+            ))}
+          </div>
+
+          <div className="ma-leaves-grid">
+            <section className="ma-panel">
+              <header className="ma-panel-head">
+                <h3>Apply leave</h3>
+                <PlusOutlined className="muted" />
+              </header>
+              <Form form={form} layout="vertical" className="ma-form" onFinish={onFinish} initialValues={{ type: "casual" }}>
+                <Form.Item name="type" label="Leave type" rules={[{ required: true }]}>
+                  <Select options={TYPES} />
+                </Form.Item>
+                <Form.Item name="range" label="From / To" rules={[{ required: true, message: "Select dates" }]}>
+                  <DatePicker.RangePicker style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item name="reason" label="Reason">
+                  <Input.TextArea rows={3} placeholder="Optional note for admin…" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={saving} className="ma-submit" block>
+                  Submit leave request
+                </Button>
+              </Form>
+            </section>
+
+            <section className="ma-panel">
+              <header className="ma-panel-head">
+                <h3>My leave requests</h3>
+                <span className="muted">{requests.length} total</span>
+              </header>
+              <Table
+                className="emp-table soft-card ma-table"
+                rowKey="_id"
+                loading={loading}
+                dataSource={requests}
+                pagination={{ pageSize: 8, showTotal: (t) => `${t} requests` }}
+                columns={[
+                  {
+                    title: "Type",
+                    dataIndex: "type",
+                    render: (v) => <Tag className="ma-leave-type">{v?.[0]?.toUpperCase() + v?.slice(1)}</Tag>,
+                  },
+                  { title: "From", dataIndex: "fromDate" },
+                  { title: "To", dataIndex: "toDate" },
+                  { title: "Days", dataIndex: "days", width: 70 },
+                  { title: "Reason", dataIndex: "reason", ellipsis: true },
+                  {
+                    title: "Status",
+                    dataIndex: "status",
+                    render: (s) => <Tag className={`ma-leave-status ${s}`}>{s}</Tag>,
+                  },
+                ]}
+              />
+            </section>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   DollarOutlined,
   DownOutlined,
   FileTextOutlined,
+  IdcardOutlined,
   LogoutOutlined,
   NotificationOutlined,
   SafetyCertificateOutlined,
@@ -46,7 +47,7 @@ const READY_ADMIN_ROUTES = new Set([
 
 const PAGE_TITLES = {
   "/dashboard": "Dashboard",
-  "/attendance": "My Attendance",
+  "/info": "My Info",
   "/admin/dashboard": "Dashboard",
   "/admin/employees": "Employees",
   "/admin/attendance": "Attendance",
@@ -78,7 +79,13 @@ export default function Layout() {
 
   const employeeItems = [
     { type: "group", label: "OVERVIEW", children: [{ key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" }] },
-    { type: "group", label: "PERSONAL", children: [{ key: "/attendance", icon: <CalendarOutlined />, label: "My Attendance" }] },
+    {
+      type: "group",
+      label: "PERSONAL",
+      children: [
+        { key: "/info", icon: <IdcardOutlined />, label: "My Info" },
+      ],
+    },
   ];
 
   const adminItems = [
