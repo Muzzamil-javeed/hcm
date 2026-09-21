@@ -5,6 +5,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MyInfo from "./pages/MyInfo";
+import ApplyLeave from "./pages/ApplyLeave";
 import AdminAttendance from "./pages/AdminAttendance";
 import AdminLeaves from "./pages/AdminLeaves";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -88,7 +89,14 @@ export default function App() {
             </EmployeeGuard>
           }
         />
-        <Route path="leave" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="leave"
+          element={
+            <EmployeeGuard>
+              <ApplyLeave />
+            </EmployeeGuard>
+          }
+        />
         <Route
           path="admin"
           element={

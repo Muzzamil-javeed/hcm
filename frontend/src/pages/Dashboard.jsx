@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { App as AntApp, Avatar, Button, Progress, Select, Spin, Table, Tag } from "antd";
 import {
   CalendarOutlined,
@@ -9,6 +9,7 @@ import {
   LineChartOutlined,
   NotificationOutlined,
   TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import {
   Bar,
@@ -118,6 +119,7 @@ export default function Dashboard() {
   const [chartMonth, setChartMonth] = useState("current");
   const [flagChart, setFlagChart] = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
+  const [teamTab, setTeamTab] = useState("team");
 
   const monthOptions = useMemo(() => {
     const now = new Date();
@@ -306,8 +308,52 @@ export default function Dashboard() {
         </article>
       </section>
 
-      <section className="ed-mid">
-        <article className="ed-panel ed-punch ed-enter" style={{ animationDelay: "360ms" }}>
+      <section className="ed-row-3">
+        <article className="ed-panel ed-team ed-enter" style={{ animationDelay: "360ms" }}>
+          <div className="ed-team-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={teamTab === "team"}
+              className={teamTab === "team" ? "active" : ""}
+              onClick={() => setTeamTab("team")}
+            >
+              <TeamOutlined /> My team
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={teamTab === "managers"}
+              className={teamTab === "managers" ? "active" : ""}
+              onClick={() => setTeamTab("managers")}
+            >
+              <UserOutlined /> My managers
+            </button>
+          </div>
+          <ul className="ed-team-list">
+            {teamTab === "team" && (data.team?.members || []).length === 0 && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>No other members in your team.</li>
+            )}
+            {teamTab === "managers" && (data.team?.managers || []).length === 0 && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>No managers found.</li>
+            )}
+            {(teamTab === "team" ? data.team?.members || [] : data.team?.managers || []).map((m) => (
+              <li key={m.empId}>
+                <Avatar size={36} style={{ background: hashColor(m.empId), flexShrink: 0 }}>
+                  {initials(m.name)}
+                </Avatar>
+                <div className="ed-team-copy">
+                  <b>{m.name}</b>
+                  <small>{m.jobTitle} · Emp {m.empId}</small>
+                </div>
+                <Tag className={`ed-team-role ${(m.role || "member").toLowerCase()}`}>{m.role || "Member"}</Tag>
+              </li>
+            ))}
+          </ul>
+          <p className="ed-team-hint">View only</p>
+        </article>
+
+        <article className="ed-panel ed-punch ed-enter" style={{ animationDelay: "400ms" }}>
           <header className="ed-panel-head">
             <h3>Today&apos;s punch</h3>
             <span className="muted">{data.today?.displayDate || "Today"}</span>
@@ -335,33 +381,7 @@ export default function Dashboard() {
           </div>
         </article>
 
-        <article className="ed-panel ed-leaves ed-enter" style={{ animationDelay: "400ms" }}>
-          <header className="ed-panel-head">
-            <h3>Leave balances</h3>
-            <TeamOutlined className="muted" />
-          </header>
-          <ul className="ed-leave-list">
-            {(data.balances || []).map((b) => (
-              <li key={b.type}>
-                <div>
-                  <b>{b.label}</b>
-                  <Progress
-                    percent={Math.min(100, (Number(b.balance) / 14) * 100)}
-                    showInfo={false}
-                    size="small"
-                    strokeColor={b.type === "sick" ? "#f59e0b" : b.type === "annual" ? "#7c3aed" : "#2563eb"}
-                    trailColor="#eef2f7"
-                  />
-                </div>
-                <em>{Number(b.balance).toFixed(1)}</em>
-              </li>
-            ))}
-          </ul>
-        </article>
-      </section>
-
-      <section className="ed-feed-row">
-        <article className="ed-panel ed-news ed-enter" style={{ animationDelay: "420ms" }}>
+        <article className="ed-panel ed-news ed-enter" style={{ animationDelay: "440ms" }}>
           <header className="ed-panel-head">
             <h3><NotificationOutlined /> Announcements</h3>
             <span className="muted">{(data.announcements || []).length} posts</span>
@@ -385,35 +405,34 @@ export default function Dashboard() {
             ))}
           </ul>
         </article>
+      </section>
 
-        <article className="ed-panel ed-team ed-enter" style={{ animationDelay: "460ms" }}>
+      <section className="ed-row-leave-week">
+        <article className="ed-panel ed-leaves ed-enter" style={{ animationDelay: "480ms" }}>
           <header className="ed-panel-head">
-            <h3><TeamOutlined /> My team</h3>
-            <span className="muted">{data.team?.name || emp.team || "—"} · {(data.team?.members || []).length}</span>
+            <h3>Leave balances</h3>
+            <Link to="/leave" className="ed-link">Apply →</Link>
           </header>
-          <ul className="ed-team-list">
-            {(data.team?.members || []).length === 0 && (
-              <li className="muted" style={{ display: "block", padding: 12 }}>No other members in your team.</li>
-            )}
-            {(data.team?.members || []).map((m) => (
-              <li key={m.empId}>
-                <Avatar size={36} style={{ background: hashColor(m.empId), flexShrink: 0 }}>
-                  {initials(m.name)}
-                </Avatar>
-                <div className="ed-team-copy">
-                  <b>{m.name}</b>
-                  <small>{m.jobTitle} · Emp {m.empId}</small>
+          <ul className="ed-leave-list">
+            {(data.balances || []).map((b) => (
+              <li key={b.type}>
+                <div>
+                  <b>{b.label}</b>
+                  <Progress
+                    percent={Math.min(100, (Number(b.balance) / 14) * 100)}
+                    showInfo={false}
+                    size="small"
+                    strokeColor={b.type === "sick" ? "#f59e0b" : b.type === "annual" ? "#7c3aed" : "#2563eb"}
+                    trailColor="#eef2f7"
+                  />
                 </div>
-                <Tag className={`ed-team-role ${(m.role || "member").toLowerCase()}`}>{m.role || "Member"}</Tag>
+                <em>{Number(b.balance).toFixed(1)}</em>
               </li>
             ))}
           </ul>
-          <p className="ed-team-hint">View only</p>
         </article>
-      </section>
 
-      <section className="ed-bottom">
-        <article className="ed-panel ed-enter" style={{ animationDelay: "500ms" }}>
+        <article className="ed-panel ed-enter" style={{ animationDelay: "520ms" }}>
           <header className="ed-panel-head ed-panel-head-wrap">
             <div>
               <h3><LineChartOutlined /> Weekly hours</h3>
@@ -460,26 +479,6 @@ export default function Dashboard() {
               { title: "Average", dataIndex: "averageLabel" },
             ]}
           />
-        </article>
-
-        <article className="ed-panel ed-enter" style={{ animationDelay: "520ms" }}>
-          <header className="ed-panel-head">
-            <h3>Needs attention</h3>
-          </header>
-          <ul className="ed-miss-list">
-            {(data.missing || []).length === 0 && (
-              <li className="muted" style={{ display: "block", padding: 12 }}>All clear — no missing days.</li>
-            )}
-            {(data.missing || []).slice(0, 8).map((m) => (
-              <li key={m.date}>
-                <div>
-                  <b>{m.label || m.date}</b>
-                  <small>{m.date}</small>
-                </div>
-                <Tag className="ed-miss-tag">{m.status}</Tag>
-              </li>
-            ))}
-          </ul>
         </article>
       </section>
     </div>

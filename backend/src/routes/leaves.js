@@ -10,11 +10,13 @@ function scopedEmpId(req) {
   return req.user.empId;
 }
 
-function countDays(fromDate, toDate) {
+function countDays(fromDate, toDate, duration = "full") {
   const start = new Date(`${fromDate}T12:00:00`);
   const end = new Date(`${toDate}T12:00:00`);
   const diff = Math.floor((end - start) / 86400000) + 1;
-  return Math.max(1, diff);
+  const days = Math.max(1, diff);
+  if (duration === "half") return Math.max(0.5, days * 0.5);
+  return days;
 }
 
 router.get("/balances", authRequired, async (req, res) => {
@@ -29,6 +31,7 @@ router.get("/balances", authRequired, async (req, res) => {
       { type: "casual", label: "Casual Leaves", balance: balance.casual },
       { type: "annual", label: "Annual Leaves", balance: balance.annual },
       { type: "sick", label: "Sick Leave", balance: balance.sick },
+      { type: "unpaid", label: "Unpaid Leave", balance: null },
     ],
   });
 });
@@ -40,8 +43,8 @@ router.get("/", authRequired, async (req, res) => {
 });
 
 router.post("/", authRequired, async (req, res) => {
-  const { type, fromDate, toDate, reason } = req.body || {};
-  if (!["casual", "annual", "sick"].includes(type)) {
+  const { type, fromDate, toDate, reason, duration } = req.body || {};
+  if (!["casual", "annual", "sick", "unpaid"].includes(type)) {
     return res.status(400).json({ message: "Invalid leave type" });
   }
   if (!fromDate || !toDate) {
@@ -50,23 +53,29 @@ router.post("/", authRequired, async (req, res) => {
   if (toDate < fromDate) {
     return res.status(400).json({ message: "To date cannot be before From date" });
   }
-  const days = countDays(fromDate, toDate);
-  const balance = await LeaveBalance.findOneAndUpdate(
-    { empId: req.user.empId },
-    { $setOnInsert: { empId: req.user.empId } },
-    { upsert: true, new: true }
-  );
-  if (balance[type] < days) {
-    return res.status(400).json({
-      message: `Not enough ${type} leave. Available: ${balance[type].toFixed(2)}`,
-    });
+  const leaveDuration = duration === "half" ? "half" : "full";
+  const days = countDays(fromDate, toDate, leaveDuration);
+
+  if (type !== "unpaid") {
+    const balance = await LeaveBalance.findOneAndUpdate(
+      { empId: req.user.empId },
+      { $setOnInsert: { empId: req.user.empId } },
+      { upsert: true, new: true }
+    );
+    if (balance[type] < days) {
+      return res.status(400).json({
+        message: `Not enough ${type} leave. Available: ${balance[type].toFixed(2)}`,
+      });
+    }
   }
+
   const request = await LeaveRequest.create({
     empId: req.user.empId,
     type,
     fromDate,
     toDate,
     days,
+    duration: leaveDuration,
     reason: reason || "",
     status: "pending",
   });
@@ -88,7 +97,7 @@ router.patch("/:id", authRequired, async (req, res) => {
   }
   request.status = status;
   await request.save();
-  if (status === "approved") {
+  if (status === "approved" && request.type !== "unpaid") {
     await LeaveBalance.findOneAndUpdate(
       { empId: request.empId },
       { $inc: { [request.type]: -request.days } }

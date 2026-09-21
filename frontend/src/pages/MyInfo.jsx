@@ -34,11 +34,11 @@ function hashColor(id) {
   return palette[hash % palette.length];
 }
 
-function InfoRow({ label, value }) {
+function TagRow({ label, value, tone = "blue" }) {
   return (
-    <div className="mi-row">
+    <div className="mi-row mi-row-tag">
       <span>{label}</span>
-      <b>{value || "—"}</b>
+      <Tag className={`mi-work-tag tone-${tone}`}>{value || "—"}</Tag>
     </div>
   );
 }
@@ -213,13 +213,13 @@ export default function MyInfo() {
                 <header className="mi-card-head">
                   <h3>Work details</h3>
                 </header>
-                <div className="mi-info-grid">
-                  <InfoRow label="Department" value={emp.department} />
-                  <InfoRow label="Designation" value={emp.jobTitle} />
-                  <InfoRow label="Role" value={emp.role} />
-                  <InfoRow label="Shift" value={emp.slot || emp.shift} />
-                  <InfoRow label="Team" value={emp.team} />
-                  <InfoRow label="Reports To" value={emp.reportsTo} />
+                <div className="mi-info-grid mi-work-tags">
+                  <TagRow label="Department" value={emp.department} tone="blue" />
+                  <TagRow label="Designation" value={emp.jobTitle} tone="navy" />
+                  <TagRow label="Role" value={emp.role} tone="amber" />
+                  <TagRow label="Shift" value={emp.slot || emp.shift} tone="teal" />
+                  <TagRow label="Team" value={emp.team} tone="green" />
+                  <TagRow label="Reports To" value={emp.reportsTo} tone="pink" />
                 </div>
               </section>
 
@@ -251,30 +251,34 @@ export default function MyInfo() {
               <section className="mi-card">
                 <header className="mi-card-head"><h3>Basic information</h3></header>
                 <div className="mi-info-grid">
-                  <InfoRow label="Phone" value={emp.mobile} />
-                  <InfoRow label="Email" value={emp.email} />
-                  <InfoRow label="Gender" value={emp.gender} />
-                  <InfoRow label="Date of Birth" value={emp.dateOfBirth} />
-                  <InfoRow label="Joining Date" value={emp.joiningDate} />
-                  <InfoRow label="Employee ID" value={emp.empId} />
+                  <TagRow label="Phone" value={emp.mobile} tone="teal" />
+                  <TagRow label="Email" value={emp.email} tone="blue" />
+                  <TagRow label="Gender" value={emp.gender} tone="navy" />
+                  <TagRow label="Date of Birth" value={emp.dateOfBirth} tone="amber" />
+                  <TagRow label="Joining Date" value={emp.joiningDate} tone="green" />
+                  <TagRow label="Employee ID" value={emp.empId} tone="pink" />
                 </div>
               </section>
               <section className="mi-card">
                 <header className="mi-card-head"><h3>Personal information</h3></header>
                 <div className="mi-info-grid">
-                  <InfoRow label="CNIC" value={emp.cnicNo} />
-                  <InfoRow label="Nationality" value="Pakistani" />
-                  <InfoRow label="Religion" value={emp.religion} />
-                  <InfoRow label="Marital Status" value={emp.maritalStatus} />
-                  <InfoRow label="Full Department" value={emp.departmentFull} />
-                  <InfoRow label="Serial No" value={emp.serialNo} />
+                  <TagRow label="CNIC" value={emp.cnicNo} tone="navy" />
+                  <TagRow label="Nationality" value="Pakistani" tone="green" />
+                  <TagRow label="Religion" value={emp.religion} tone="amber" />
+                  <TagRow label="Marital Status" value={emp.maritalStatus} tone="pink" />
+                  <TagRow label="Full Department" value={emp.departmentFull} tone="blue" />
+                  <TagRow label="Serial No" value={emp.serialNo} tone="teal" />
                 </div>
               </section>
               <section className="mi-card">
                 <header className="mi-card-head"><h3>Emergency contact</h3></header>
                 <div className="mi-info-grid">
-                  <InfoRow label="Primary" value={emp.reportsTo && emp.reportsTo !== "-" ? emp.reportsTo : "HR Softnox"} />
-                  <InfoRow label="Phone" value={emp.mobile} />
+                  <TagRow
+                    label="Primary"
+                    value={emp.reportsTo && emp.reportsTo !== "-" ? emp.reportsTo : "HR Softnox"}
+                    tone="pink"
+                  />
+                  <TagRow label="Phone" value={emp.mobile} tone="teal" />
                 </div>
               </section>
             </div>
@@ -313,7 +317,10 @@ export default function MyInfo() {
           {tab === "leaves" && (
             <div className="mi-stack mi-enter" key="leaves">
               <section className="mi-card">
-                <header className="mi-card-head"><h3>Leave balances</h3></header>
+                <header className="mi-card-head">
+                  <h3>Leave balances</h3>
+                  <Link to="/leave" className="mi-link">Apply leave →</Link>
+                </header>
                 <div className="mi-bal-grid">
                   {balances.map((b) => (
                     <article key={b.key} className="mi-bal">

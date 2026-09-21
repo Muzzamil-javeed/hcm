@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar, Badge, Dropdown, Input, Layout as AntLayout, Menu, Select, message } from "antd";
 import {
   AuditOutlined,
@@ -7,6 +8,7 @@ import {
   BellOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
+  CloseCircleOutlined,
   DashboardOutlined,
   DesktopOutlined,
   DollarOutlined,
@@ -23,6 +25,7 @@ import {
   UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import api from "../api";
 import { useAuth } from "../context/AuthContext";
 
 const { Header, Sider, Content, Footer } = AntLayout;
@@ -48,6 +51,7 @@ const READY_ADMIN_ROUTES = new Set([
 const PAGE_TITLES = {
   "/dashboard": "Dashboard",
   "/info": "My Info",
+  "/leave": "Apply Leave",
   "/admin/dashboard": "Dashboard",
   "/admin/employees": "Employees",
   "/admin/attendance": "Attendance",
@@ -70,12 +74,107 @@ export default function Layout() {
   const loc = useLocation();
   const navigate = useNavigate();
   const isAdmin = Boolean(user?.isSuperAdmin);
+  const [notifications, setNotifications] = useState([]);
+  const [seenAt, setSeenAt] = useState(() => {
+    try {
+      return localStorage.getItem(`flowhcm_notif_seen_${user?.empId || "guest"}`) || "";
+    } catch {
+      return "";
+    }
+  });
+
   const initials = (user?.name || "U")
     .split(" ")
     .map((p) => p[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const loadNotifications = useCallback(async () => {
+    if (!user?.empId || user?.isSuperAdmin) return;
+    try {
+      const { data } = await api.get("/dashboard/notifications");
+      setNotifications(data.notifications || []);
+    } catch {
+      /* ignore poll errors */
+    }
+  }, [user?.empId, user?.isSuperAdmin]);
+
+  useEffect(() => {
+    loadNotifications();
+    if (isAdmin) return undefined;
+    const id = setInterval(loadNotifications, 45000);
+    return () => clearInterval(id);
+  }, [loadNotifications, isAdmin]);
+
+  useEffect(() => {
+    try {
+      setSeenAt(localStorage.getItem(`flowhcm_notif_seen_${user?.empId || "guest"}`) || "");
+    } catch {
+      setSeenAt("");
+    }
+  }, [user?.empId]);
+
+  const unreadCount = useMemo(() => {
+    if (!notifications.length) return 0;
+    if (!seenAt) return notifications.length;
+    const seenMs = new Date(seenAt).getTime();
+    return notifications.filter((n) => new Date(n.at).getTime() > seenMs).length;
+  }, [notifications, seenAt]);
+
+  function markNotificationsSeen() {
+    const stamp = new Date().toISOString();
+    setSeenAt(stamp);
+    try {
+      localStorage.setItem(`flowhcm_notif_seen_${user?.empId || "guest"}`, stamp);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function formatNotifTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const employeeNotifPanel = (
+    <div className="emp-note-panel">
+      <header className="emp-note-head">
+        <b>Notifications</b>
+        {unreadCount > 0 && <em>{unreadCount} new</em>}
+      </header>
+      <ul className="emp-note-list">
+        {!notifications.length && (
+          <li className="emp-note-empty">No notifications yet</li>
+        )}
+        {notifications.map((n) => (
+          <li key={n.id} className={`tone-${n.tone || "blue"}`}>
+            <span className="emp-note-ico">
+              {n.type === "leave_approved" ? (
+                <CheckCircleOutlined />
+              ) : n.type === "leave_rejected" ? (
+                <CloseCircleOutlined />
+              ) : (
+                <NotificationOutlined />
+              )}
+            </span>
+            <div>
+              <strong>{n.title}</strong>
+              <p>{n.body}</p>
+              <small>{formatNotifTime(n.at)}</small>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
   const employeeItems = [
     { type: "group", label: "OVERVIEW", children: [{ key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" }] },
@@ -84,6 +183,7 @@ export default function Layout() {
       label: "PERSONAL",
       children: [
         { key: "/info", icon: <IdcardOutlined />, label: "My Info" },
+        { key: "/leave", icon: <CalendarOutlined />, label: "Apply Leave" },
       ],
     },
   ];
@@ -230,17 +330,37 @@ export default function Layout() {
             </div>
           </Header>
         ) : (
-          <Header className="softnox-header">
+          <Header className="softnox-header emp-header">
             <span>{pageLabel} / Home</span>
-            <Dropdown
-              menu={profileMenu}
-              trigger={["click"]}
-              placement="bottomRight"
-              overlayClassName="profile-drop"
-              dropdownRender={profileDropdown}
-            >
-              {profileTrigger}
-            </Dropdown>
+            <div className="emp-topbar-right">
+              <Dropdown
+                trigger={["click"]}
+                placement="bottomRight"
+                onOpenChange={(open) => {
+                  if (open) markNotificationsSeen();
+                }}
+                dropdownRender={() => employeeNotifPanel}
+              >
+                <button
+                  type="button"
+                  className={`admin-bell${unreadCount > 0 ? " has-unread" : ""}`}
+                  aria-label="Notifications"
+                >
+                  <Badge count={unreadCount} size="small" className="admin-bell-badge" overflowCount={9}>
+                    <BellOutlined className="admin-bell-icon" />
+                  </Badge>
+                </button>
+              </Dropdown>
+              <Dropdown
+                menu={profileMenu}
+                trigger={["click"]}
+                placement="bottomRight"
+                overlayClassName="profile-drop"
+                dropdownRender={profileDropdown}
+              >
+                {profileTrigger}
+              </Dropdown>
+            </div>
           </Header>
         )}
         <Content className="softnox-content">

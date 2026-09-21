@@ -5,12 +5,17 @@ const leaveRequestSchema = new mongoose.Schema(
     empId: { type: String, required: true, index: true },
     type: {
       type: String,
-      enum: ["casual", "annual", "sick"],
+      enum: ["casual", "annual", "sick", "unpaid"],
       required: true,
     },
     fromDate: { type: String, required: true },
     toDate: { type: String, required: true },
     days: { type: Number, required: true },
+    duration: {
+      type: String,
+      enum: ["full", "half"],
+      default: "full",
+    },
     reason: { type: String, default: "" },
     status: {
       type: String,

@@ -124,7 +124,8 @@ router.get("/summary", authRequired, async (req, res) => {
   const recentLogs = await AttendanceLog.find({ empId }).sort({ punchedAt: -1 }).limit(25);
 
   const teamName = employee?.team || "General";
-  const [announcements, teamMembers] = await Promise.all([
+  const reportsToName = String(employee?.reportsTo || "").trim();
+  const [announcements, teamMembers, managerByName] = await Promise.all([
     Announcement.find({ audience: { $in: ["all", "employees"] } })
       .sort({ createdAt: -1 })
       .limit(8)
@@ -135,10 +136,35 @@ router.get("/summary", authRequired, async (req, res) => {
       $or: [{ source: "roster" }, { joiningDate: { $nin: ["", null] } }],
     })
       .sort({ name: 1 })
-      .limit(16)
+      .limit(40)
       .select("empId name jobTitle department team role")
       .lean(),
+    reportsToName && reportsToName !== "-"
+      ? Employee.findOne({
+          name: { $regex: `^${reportsToName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+        })
+          .select("empId name jobTitle department team role")
+          .lean()
+      : Promise.resolve(null),
   ]);
+
+  const isManagerRole = (role = "") => /manager|lead|head|director|supervisor/i.test(String(role));
+  const mapPerson = (m) => ({
+    empId: m.empId,
+    name: m.name,
+    jobTitle: m.jobTitle || "Employee",
+    department: m.department || "—",
+    role: m.role || "Member",
+  });
+
+  const managersMap = new Map();
+  if (managerByName) managersMap.set(managerByName.empId, mapPerson(managerByName));
+  for (const m of teamMembers) {
+    if (isManagerRole(m.role)) managersMap.set(m.empId, mapPerson(m));
+  }
+  const managers = [...managersMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const managerIds = new Set(managers.map((m) => m.empId));
+  const peers = teamMembers.filter((m) => !managerIds.has(m.empId)).slice(0, 24).map(mapPerson);
 
   res.json({
     employee: employee
@@ -200,13 +226,8 @@ router.get("/summary", authRequired, async (req, res) => {
     })),
     team: {
       name: teamName,
-      members: teamMembers.map((m) => ({
-        empId: m.empId,
-        name: m.name,
-        jobTitle: m.jobTitle || "Employee",
-        department: m.department || "—",
-        role: m.role || "Member",
-      })),
+      members: peers,
+      managers,
     },
   });
 });
@@ -276,6 +297,64 @@ router.get("/profile", authRequired, async (req, res) => {
     recentLeaves,
     assets,
   });
+});
+
+router.get("/notifications", authRequired, async (req, res) => {
+  const empId = req.user.empId;
+  if (!empId || empId === "ADMIN") {
+    return res.json({ notifications: [], unread: 0 });
+  }
+
+  const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+
+  const [announcements, leaveDecisions] = await Promise.all([
+    Announcement.find({
+      audience: { $in: ["all", "employees"] },
+      createdAt: { $gte: since },
+    })
+      .sort({ createdAt: -1 })
+      .limit(12)
+      .lean(),
+    LeaveRequest.find({
+      empId,
+      status: { $in: ["approved", "rejected"] },
+      updatedAt: { $gte: since },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(12)
+      .lean(),
+  ]);
+
+  const notifications = [
+    ...announcements.map((a) => ({
+      id: `ann-${a._id}`,
+      type: "announcement",
+      tone: "blue",
+      title: a.title || "New announcement",
+      body: a.body || "A new Softnox announcement was posted.",
+      at: a.createdAt,
+    })),
+    ...leaveDecisions.map((l) => {
+      const approved = l.status === "approved";
+      const typeLabel = String(l.type || "leave").replace(/^\w/, (c) => c.toUpperCase());
+      return {
+        id: `leave-${l._id}-${l.status}`,
+        type: approved ? "leave_approved" : "leave_rejected",
+        tone: approved ? "green" : "red",
+        title: approved ? "Leave approved" : "Leave rejected",
+        body: `Your ${typeLabel} leave (${l.fromDate} → ${l.toDate}) was ${l.status}.`,
+        at: l.updatedAt || l.createdAt,
+      };
+    }),
+  ]
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 20)
+    .map((n) => ({
+      ...n,
+      at: n.at ? new Date(n.at).toISOString() : null,
+    }));
+
+  res.json({ notifications });
 });
 
 export default router;
