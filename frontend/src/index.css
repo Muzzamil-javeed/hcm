@@ -3541,7 +3541,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Payroll Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Payroll ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 .pay-note {
   display: flex;
   align-items: flex-start;
@@ -3770,7 +3770,7 @@ body {
   box-shadow: none;
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Reports Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Reports ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 .rpt-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3798,7 +3798,7 @@ body {
   .pay-donut, .rpt-donut { margin: 0 auto; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Announcements Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Announcements ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes annIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4039,7 +4039,7 @@ body {
   .ann-composer { position: static; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Settings Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Settings ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes setIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4164,7 +4164,7 @@ body {
 .set-rules b { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .set-rules span { font-size: 14px; color: var(--navy); font-weight: 600; line-height: 1.35; }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Roles Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Roles ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes roleIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4388,7 +4388,7 @@ body {
   .role-search { width: 100%; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Audit Logs Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Audit Logs ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes audIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4553,7 +4553,7 @@ body {
   .aud-search { width: 100%; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ Devices Management Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Devices Management ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes devIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4729,7 +4729,7 @@ body {
   .dev-kpis { grid-template-columns: 1fr; }
 }
 
-/* ÂÂ Employee Dashboard ÂÂ */
+/* ÃÂÃÂ Employee Dashboard ÃÂÃÂ */
 @keyframes edIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4825,14 +4825,72 @@ body {
 }
 .ed-row-leave-week {
   display: grid;
-  grid-template-columns: minmax(240px, 3fr) minmax(0, 9fr);
+  grid-template-columns: minmax(220px, 3fr) minmax(240px, 3fr) minmax(0, 6fr);
   gap: 12px;
   align-items: start;
 }
-.ed-row-leave-week .ed-leaves {
+.ed-row-leave-week .ed-leaves,
+.ed-row-leave-week .ed-payslip {
   height: fit-content;
   align-self: start;
 }
+.ed-payslip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--navy);
+  font-size: 15px;
+}
+.ed-payslip-head h3 {
+  margin: 0;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--navy);
+}
+.ed-payslip-sub {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3a5f;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+.ed-payslip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ed-payslip-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #334155;
+}
+.ed-payslip-list li:last-child { border-bottom: 0; }
+.ed-payslip-list em {
+  font-style: normal;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ed-payslip-link {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.ed-payslip-link:hover { text-decoration: underline; }
 .ed-flags-row {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -5241,7 +5299,7 @@ body {
   .ed-kpis, .ed-row-3, .ed-row-leave-week, .ed-flags-row { grid-template-columns: 1fr; }
 }
 
-/* ï¿½ï¿½ My Info (employee) ï¿½ï¿½ */
+/* Ã¯Â¿Â½Ã¯Â¿Â½ My Info (employee) Ã¯Â¿Â½Ã¯Â¿Â½ */
 @keyframes miIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -5641,7 +5699,7 @@ a.mi-contact-chip:hover {
   .mi-asset-meta { grid-column: 2; text-align: left; align-items: flex-start; }
 }
 
-/* ï¿½ï¿½ My Attendance ï¿½ï¿½ */
+/* Ã¯Â¿Â½Ã¯Â¿Â½ My Attendance Ã¯Â¿Â½Ã¯Â¿Â½ */
 @keyframes maIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -6100,4 +6158,167 @@ a.mi-contact-chip:hover {
 
 @media (max-width: 1000px) {
   .al-layout, .al-bal-grid, .al-form-grid { grid-template-columns: 1fr; }
+}
+
+/* -- Softnox Payslip viewer -- */
+.ps-boot { min-height: 240px; display: grid; place-items: center; }
+.ps-shell { display: flex; flex-direction: column; gap: 12px; }
+.ps-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ps-toolbar b { color: #1d4ed8; font-size: 14px; }
+.ps-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ps-actions .ant-btn-primary {
+  background: #2563eb !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+}
+.ps-doc {
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+}
+.ps-meta {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.ps-meta span {
+  display: inline-block;
+  min-width: 88px;
+  color: #2563eb;
+  font-weight: 700;
+}
+.ps-title-block { text-align: center; }
+.ps-title-block h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+.ps-title-block p {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: #334155;
+}
+.ps-emp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 18px;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.ps-emp-grid > div { display: flex; flex-direction: column; gap: 8px; }
+.ps-emp-grid span {
+  display: inline-block;
+  min-width: 118px;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 12px;
+}
+.ps-emp-grid b { color: #0f172a; font-weight: 700; }
+.ps-emp-grid > div > div { display: flex; gap: 8px; align-items: baseline; }
+.ps-main {
+  display: grid;
+  grid-template-columns: 1.1fr 1.1fr 1fr;
+  border: 1px solid #cbd5e1;
+  border-top: 3px solid #2563eb;
+  margin-bottom: 12px;
+}
+.ps-col, .ps-side { min-width: 0; }
+.ps-col + .ps-col, .ps-side { border-left: 1px solid #cbd5e1; }
+.ps-col header, .ps-col footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-weight: 800;
+  color: #1e3a5f;
+  background: #f8fafc;
+}
+.ps-col ul { list-style: none; margin: 0; padding: 0; min-height: 120px; }
+.ps-col li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #eef2f7;
+}
+.ps-col footer { border-top: 1px solid #cbd5e1; }
+.ps-side { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.ps-tax {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 4px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+.ps-tax span { color: #2563eb; font-weight: 700; }
+.ps-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ps-box h4 {
+  margin: 0;
+  padding: 6px 8px;
+  background: #f1f5f9;
+  font-size: 12px;
+  color: #1e3a5f;
+}
+.ps-box-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid #eef2f7;
+  font-size: 12px;
+}
+.ps-net {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ps-net > div { display: flex; gap: 16px; align-items: baseline; }
+.ps-net span { color: #2563eb; font-weight: 700; min-width: 120px; }
+.ps-net b { color: #0f172a; }
+.ps-foot {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+}
+.ps-modal .ant-modal-body { padding: 16px 18px 20px; }
+
+@media print {
+  body * { visibility: hidden !important; }
+  #softnox-payslip-print, #softnox-payslip-print * { visibility: visible !important; }
+  #softnox-payslip-print {
+    position: absolute !important;
+    left: 0; top: 0; width: 100%;
+    padding: 12px;
+  }
+  .no-print, .ant-modal-close, .ps-toolbar { display: none !important; }
+  .ant-modal, .ant-modal-content, .ant-modal-body {
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .ps-meta, .ps-emp-grid, .ps-main { grid-template-columns: 1fr; }
+  .ps-col + .ps-col, .ps-side { border-left: 0; border-top: 1px solid #cbd5e1; }
 }

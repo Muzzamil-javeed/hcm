@@ -6,6 +6,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  DollarOutlined,
   LineChartOutlined,
   NotificationOutlined,
   TeamOutlined,
@@ -25,6 +26,7 @@ import {
 } from "recharts";
 import api from "../api";
 import { useAuth } from "../context/AuthContext";
+import PayslipViewer from "../components/PayslipViewer";
 
 const FLAG_LEGEND = [
   { label: "Present", color: "#2563eb" },
@@ -120,6 +122,10 @@ export default function Dashboard() {
   const [flagChart, setFlagChart] = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [teamTab, setTeamTab] = useState("team");
+  const [payslipPeriods, setPayslipPeriods] = useState([]);
+  const [payslipOpen, setPayslipOpen] = useState(false);
+  const [payslipLoading, setPayslipLoading] = useState(false);
+  const [payslip, setPayslip] = useState(null);
 
   const monthOptions = useMemo(() => {
     const now = new Date();
@@ -133,14 +139,31 @@ export default function Dashboard() {
 
   async function load() {
     setLoadError("");
-    const [{ data: summary }, todayRes] = await Promise.all([
+    const [{ data: summary }, todayRes, payslipRes] = await Promise.all([
       api.get("/dashboard/summary"),
       api.get("/attendance/today").catch(() => ({ data: null })),
+      api.get("/dashboard/payslips").catch(() => ({ data: { periods: [] } })),
     ]);
     setData(summary);
     setFlagChart(summary.flagChart || []);
     setChartMonth("current");
     setTodayPunch(todayRes.data);
+    setPayslipPeriods(payslipRes.data?.periods || []);
+  }
+
+  async function openPayslip(periodKey) {
+    setPayslipOpen(true);
+    setPayslipLoading(true);
+    setPayslip(null);
+    try {
+      const { data } = await api.get(`/dashboard/payslips/${periodKey}`);
+      setPayslip(data.payslip);
+    } catch (err) {
+      message.error(err.response?.data?.message || "Could not load payslip");
+      setPayslipOpen(false);
+    } finally {
+      setPayslipLoading(false);
+    }
   }
 
   async function loadFlagChart(mode) {
@@ -432,6 +455,31 @@ export default function Dashboard() {
           </ul>
         </article>
 
+        <article className="ed-panel ed-payslip ed-enter" style={{ animationDelay: "500ms" }}>
+          <header className="ed-payslip-head">
+            <DollarOutlined />
+            <h3>Employee payslip</h3>
+          </header>
+          <p className="ed-payslip-sub">Payslip period</p>
+          <ul className="ed-payslip-list">
+            {payslipPeriods.map((p) => (
+              <li key={p.periodKey}>
+                <span>{p.label}</span>
+                {p.expected ? (
+                  <em>Expected Payslip</em>
+                ) : (
+                  <button type="button" className="ed-payslip-link" onClick={() => openPayslip(p.periodKey)}>
+                    View Payslip
+                  </button>
+                )}
+              </li>
+            ))}
+            {!payslipPeriods.length && (
+              <li className="muted" style={{ display: "block", padding: 12 }}>No payslip periods yet.</li>
+            )}
+          </ul>
+        </article>
+
         <article className="ed-panel ed-enter" style={{ animationDelay: "520ms" }}>
           <header className="ed-panel-head ed-panel-head-wrap">
             <div>
@@ -481,6 +529,13 @@ export default function Dashboard() {
           />
         </article>
       </section>
+
+      <PayslipViewer
+        open={payslipOpen}
+        loading={payslipLoading}
+        payslip={payslip}
+        onClose={() => setPayslipOpen(false)}
+      />
     </div>
   );
 }

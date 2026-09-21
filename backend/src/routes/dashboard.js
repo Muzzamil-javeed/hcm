@@ -357,4 +357,145 @@ router.get("/notifications", authRequired, async (req, res) => {
   res.json({ notifications });
 });
 
+const ROLE_GROSS = { Head: 180000, Manager: 130000, Member: 70000 };
+
+function monthLabel(year, monthIndex) {
+  return new Date(year, monthIndex, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
+function amountInWords(n) {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  function underThousand(num) {
+    if (num < 20) return ones[num];
+    if (num < 100) return `${tens[Math.floor(num / 10)]}${num % 10 ? ` ${ones[num % 10]}` : ""}`;
+    return `${ones[Math.floor(num / 100)]} Hundred${num % 100 ? ` ${underThousand(num % 100)}` : ""}`;
+  }
+  const amount = Math.round(Number(n) || 0);
+  if (!amount) return "Zero Only";
+  const crore = Math.floor(amount / 10000000);
+  const lakh = Math.floor((amount % 10000000) / 100000);
+  const thousand = Math.floor((amount % 100000) / 1000);
+  const rest = amount % 1000;
+  const parts = [];
+  if (crore) parts.push(`${underThousand(crore)} Crore`);
+  if (lakh) parts.push(`${underThousand(lakh)} Lakh`);
+  if (thousand) parts.push(`${underThousand(thousand)} Thousand`);
+  if (rest) parts.push(underThousand(rest));
+  return `${parts.join(" ")} Only`;
+}
+
+function buildPayslip(employee, balance, year, monthIndex, { expected = false } = {}) {
+  const role = employee?.role || "Member";
+  const monthly = ROLE_GROSS[role] || ROLE_GROSS.Member;
+  const basic = Math.round(monthly * 0.9);
+  const medical = monthly - basic;
+  const eobi = 370;
+  const iTax = Math.max(0, Math.round(monthly * 0.0195));
+  const totalEarning = basic + medical;
+  const totalDeduction = eobi + iTax;
+  const net = totalEarning - totalDeduction;
+  const periodKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const periodLabel = monthLabel(year, monthIndex);
+
+  return {
+    periodKey,
+    periodLabel,
+    expected,
+    company: "Softnox Technologies (Pvt) Ltd",
+    address: "Karachi, Pakistan",
+    printDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    employee: {
+      empId: employee?.empId || "—",
+      name: employee?.name || "—",
+      department: employee?.department || "—",
+      departmentFull: employee?.departmentFull || employee?.department || "—",
+      team: employee?.team || "—",
+      jobTitle: employee?.jobTitle || "Employee",
+      cnicNo: employee?.cnicNo || "—",
+      joiningDate: employee?.joiningDate || "—",
+      status: "Active",
+      station: "Softnox HQ",
+      monthlySalary: monthly,
+    },
+    earnings: [
+      { label: "Basic Salary", amount: basic },
+      { label: "Medical", amount: medical },
+    ],
+    deductions: [
+      { label: "EOBI", amount: eobi },
+      { label: "I Tax Amount", amount: iTax },
+    ],
+    totals: {
+      earning: totalEarning,
+      deduction: totalDeduction,
+      net,
+      taxPaidFiscal: iTax * Math.min(monthIndex + 1, 12),
+      netWords: amountInWords(net),
+    },
+    leaveBalances: {
+      casual: Number(balance?.casual ?? 10),
+      annual: Number(balance?.annual ?? 14),
+      sick: Number(balance?.sick ?? 8),
+    },
+    loanBalances: [{ label: "Soft Loan", amount: 0 }],
+  };
+}
+
+router.get("/payslips", authRequired, async (req, res) => {
+  const empId = req.user.empId;
+  if (!empId || empId === "ADMIN") {
+    return res.status(400).json({ message: "Payslips are only for staff accounts" });
+  }
+
+  const now = new Date();
+  const periods = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const monthIndex = d.getMonth();
+    const periodKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const expected = i === 0;
+    periods.push({
+      periodKey,
+      label: `${d.toLocaleString("en-US", { month: "long" })} - ${year}`,
+      expected,
+      status: expected ? "Expected Payslip" : "View Payslip",
+    });
+  }
+
+  res.json({ periods });
+});
+
+router.get("/payslips/:periodKey", authRequired, async (req, res) => {
+  const empId = req.user.empId;
+  if (!empId || empId === "ADMIN") {
+    return res.status(400).json({ message: "Payslips are only for staff accounts" });
+  }
+
+  const match = String(req.params.periodKey || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return res.status(400).json({ message: "Invalid period" });
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (monthIndex < 0 || monthIndex > 11) return res.status(400).json({ message: "Invalid period" });
+
+  const now = new Date();
+  const expected = year === now.getFullYear() && monthIndex === now.getMonth();
+
+  const [employee, balance] = await Promise.all([
+    Employee.findOne({ empId }),
+    LeaveBalance.findOneAndUpdate(
+      { empId },
+      { $setOnInsert: { empId } },
+      { upsert: true, new: true }
+    ),
+  ]);
+
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  res.json({
+    payslip: buildPayslip(employee, balance, year, monthIndex, { expected }),
+  });
+});
+
 export default router;
