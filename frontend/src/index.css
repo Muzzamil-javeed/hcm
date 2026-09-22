@@ -3541,7 +3541,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Payroll ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Payroll ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 .pay-note {
   display: flex;
   align-items: flex-start;
@@ -3770,7 +3770,7 @@ body {
   box-shadow: none;
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Reports ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Reports ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 .rpt-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3798,7 +3798,7 @@ body {
   .pay-donut, .rpt-donut { margin: 0 auto; }
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Announcements ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Announcements ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 @keyframes annIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4039,7 +4039,7 @@ body {
   .ann-composer { position: static; }
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Settings ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Settings ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 @keyframes setIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4164,7 +4164,7 @@ body {
 .set-rules b { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .set-rules span { font-size: 14px; color: var(--navy); font-weight: 600; line-height: 1.35; }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Roles ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Roles ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 @keyframes roleIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4388,7 +4388,7 @@ body {
   .role-search { width: 100%; }
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Audit Logs ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Audit Logs ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 @keyframes audIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4553,7 +4553,7 @@ body {
   .aud-search { width: 100%; }
 }
 
-/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ Devices Management ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
+/* ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ Devices Management ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ÃÂÃÂ¯ÃÂÃÂ¿ÃÂÃÂ½ */
 @keyframes devIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4729,7 +4729,7 @@ body {
   .dev-kpis { grid-template-columns: 1fr; }
 }
 
-/* ÃÂÃÂ Employee Dashboard ÃÂÃÂ */
+/* ÃÂÃÂÃÂÃÂ Employee Dashboard ÃÂÃÂÃÂÃÂ */
 @keyframes edIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4827,12 +4827,24 @@ body {
   display: grid;
   grid-template-columns: minmax(220px, 3fr) minmax(240px, 3fr) minmax(0, 6fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
-.ed-row-leave-week .ed-leaves,
-.ed-row-leave-week .ed-payslip {
-  height: fit-content;
-  align-self: start;
+.ed-row-leave-week > .ed-panel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ed-row-leave-week .ed-leave-list,
+.ed-row-leave-week .ed-payslip-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.ed-row-leave-week .ed-chart,
+.ed-row-leave-week .ed-week-table {
+  flex-shrink: 0;
 }
 .ed-payslip-head {
   display: flex;
@@ -4841,6 +4853,7 @@ body {
   margin-bottom: 4px;
   color: var(--navy);
   font-size: 15px;
+  flex-shrink: 0;
 }
 .ed-payslip-head h3 {
   margin: 0;
@@ -4856,13 +4869,12 @@ body {
   color: #1e3a5f;
   padding-bottom: 8px;
   border-bottom: 1px solid #eef2f7;
+  flex-shrink: 0;
 }
 .ed-payslip-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 260px;
-  overflow-y: auto;
 }
 .ed-payslip-list li {
   display: flex;
@@ -5299,7 +5311,7 @@ body {
   .ed-kpis, .ed-row-3, .ed-row-leave-week, .ed-flags-row { grid-template-columns: 1fr; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ My Info (employee) Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ My Info (employee) ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes miIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -5699,7 +5711,7 @@ a.mi-contact-chip:hover {
   .mi-asset-meta { grid-column: 2; text-align: left; align-items: flex-start; }
 }
 
-/* Ã¯Â¿Â½Ã¯Â¿Â½ My Attendance Ã¯Â¿Â½Ã¯Â¿Â½ */
+/* ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ My Attendance ÃÂ¯ÃÂ¿ÃÂ½ÃÂ¯ÃÂ¿ÃÂ½ */
 @keyframes maIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
