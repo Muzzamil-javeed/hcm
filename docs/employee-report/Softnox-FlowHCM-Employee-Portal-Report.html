@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Softnox FlowHCM — Employee Portal Functional Report</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Calibri, Arial, sans-serif;
+      color: #18181b;
+      background: #fff;
+      font-size: 11pt;
+      line-height: 1.45;
+    }
+    .cover {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border: 1px solid #d4d4d8;
+      padding: 48px 40px;
+      page-break-after: always;
+    }
+    .cover .brand {
+      font-size: 13pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #27272a;
+      margin-bottom: 28px;
+    }
+    .cover h1 {
+      margin: 0 0 12px;
+      font-size: 28pt;
+      line-height: 1.2;
+      color: #09090b;
+    }
+    .cover .subtitle {
+      margin: 0 0 36px;
+      font-size: 13pt;
+      color: #52525b;
+      max-width: 520px;
+    }
+    .meta-table {
+      width: 100%;
+      max-width: 420px;
+      border-collapse: collapse;
+      margin-top: 24px;
+    }
+    .meta-table th, .meta-table td {
+      text-align: left;
+      padding: 8px 0;
+      border-bottom: 1px solid #e4e4e7;
+      font-size: 10.5pt;
+    }
+    .meta-table th {
+      width: 140px;
+      color: #71717a;
+      font-weight: 600;
+    }
+    .toc {
+      page-break-after: always;
+      padding-top: 8px;
+    }
+    .toc h2 { margin-top: 0; }
+    .toc ol { padding-left: 22px; }
+    .toc li { margin: 8px 0; }
+    h2.section {
+      margin: 0 0 8px;
+      font-size: 16pt;
+      color: #09090b;
+      border-bottom: 2px solid #18181b;
+      padding-bottom: 6px;
+    }
+    h3 {
+      margin: 18px 0 6px;
+      font-size: 12.5pt;
+      color: #27272a;
+    }
+    p { margin: 0 0 10px; }
+    ul { margin: 0 0 12px; padding-left: 20px; }
+    li { margin: 4px 0; }
+    .screen {
+      page-break-after: always;
+      padding-top: 4px;
+    }
+    .screen:last-of-type { page-break-after: auto; }
+    .badge {
+      display: inline-block;
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      background: #18181b;
+      padding: 3px 8px;
+      margin-bottom: 10px;
+    }
+    .shot {
+      width: 100%;
+      border: 1px solid #a1a1aa;
+      margin: 10px 0 14px;
+      display: block;
+    }
+    .caption {
+      font-size: 9.5pt;
+      color: #52525b;
+      font-style: italic;
+      margin: -8px 0 14px;
+    }
+    .box {
+      border: 1px solid #d4d4d8;
+      background: #fafafa;
+      padding: 12px 14px;
+      margin: 12px 0;
+    }
+    .box strong { color: #09090b; }
+    .footer-note {
+      margin-top: 28px;
+      padding-top: 12px;
+      border-top: 1px solid #d4d4d8;
+      font-size: 9.5pt;
+      color: #71717a;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0 20px;
+    }
+    .summary-grid div {
+      border: 1px solid #e4e4e7;
+      padding: 10px 12px;
+    }
+    .summary-grid b { display: block; margin-bottom: 4px; font-size: 10.5pt; }
+    .summary-grid span { font-size: 10pt; color: #52525b; }
+    @media print {
+      .no-print { display: none !important; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="cover">
+    <div class="brand">Softnox Technologies (Pvt) Ltd</div>
+    <h1>FlowHCM Employee Portal<br/>Functional Report</h1>
+    <p class="subtitle">
+      A concise, screen-by-screen overview of what a Softnox employee can view and perform
+      inside the employee self-service portal.
+    </p>
+    <table class="meta-table">
+      <tr><th>Document Type</th><td>Employee Module — Functional Walkthrough</td></tr>
+      <tr><th>Scope</th><td>Employee screens only (Dashboard, My Info, Apply Leave, Payslip)</td></tr>
+      <tr><th>Sample User</th><td>Emp 112 — MUZZAMIL JAVEED (Sr. Frontend Specialist)</td></tr>
+      <tr><th>Prepared For</th><td>Softnox Management / Leadership Review</td></tr>
+      <tr><th>Prepared On</th><td>22 September 2026</td></tr>
+      <tr><th>System</th><td>Softnox FlowHCM</td></tr>
+    </table>
+    <p class="footer-note">
+      Confidential — for internal Softnox use. Screenshots reflect the live employee experience.
+    </p>
+  </section>
+
+  <section class="toc">
+    <h2 class="section">1. Document Purpose</h2>
+    <p>
+      This report explains the <strong>employee-facing Softnox FlowHCM portal</strong>: what each
+      screen shows, and what actions an employee can take. It is intended for leadership review
+      and onboarding clarity — not a technical development document.
+    </p>
+
+    <h2 class="section" style="margin-top:28px">2. Employee Access Summary</h2>
+    <p>After login, an employee has a focused sidebar with three primary destinations:</p>
+    <div class="summary-grid">
+      <div><b>Dashboard</b><span>Attendance, team, announcements, leaves, payslips, weekly hours</span></div>
+      <div><b>My Info</b><span>Profile, personal data, assets, leave history</span></div>
+      <div><b>Apply Leave</b><span>Submit leave requests and track status</span></div>
+      <div><b>Notifications</b><span>Bell alerts for news, leave approval/rejection</span></div>
+    </div>
+
+    <h2 class="section">3. Contents</h2>
+    <ol>
+      <li>Employee Dashboard</li>
+      <li>My Info — Overview</li>
+      <li>My Info — Personal</li>
+      <li>My Info — Leaves</li>
+      <li>Apply Leave</li>
+      <li>Employee Payslip (View / Print / PDF)</li>
+      <li>Capability Checklist</li>
+    </ol>
+  </section>
+
+  <!-- 1 Dashboard -->
+  <section class="screen">
+    <div class="badge">Screen 01</div>
+    <h2 class="section">Employee Dashboard</h2>
+    <p>
+      The Dashboard is the employee home page. It gives a single-view snapshot of attendance,
+      today’s punches, team context, company announcements, leave balances, payslip history,
+      and weekly work hours.
+    </p>
+    <img class="shot" src="images/01-dashboard.jpg" alt="Employee Dashboard" />
+    <p class="caption">Figure 1 — Softnox Employee Dashboard (full page)</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li><strong>Monthly KPIs:</strong> Present, Late, Absent, On Leave, and Hours Worked vs schedule.</li>
+      <li><strong>Profile card:</strong> Name, designation, Emp ID, department, team, and today’s shift window.</li>
+      <li><strong>Attendance chart:</strong> Day-wise status bars for the selected month (current / previous).</li>
+      <li><strong>My Team / My Managers:</strong> View-only roster of teammates and reporting managers.</li>
+      <li><strong>Today’s punch:</strong> Check-in, check-out, hours worked, and month progress.</li>
+      <li><strong>Announcements:</strong> Latest Softnox news visible to employees.</li>
+      <li><strong>Leave balances:</strong> Remaining Casual, Annual, and Sick leave with Apply shortcut.</li>
+      <li><strong>Employee Payslip list:</strong> Past months with “View Payslip”; current month as Expected.</li>
+      <li><strong>Weekly hours:</strong> Scheduled vs worked vs average chart and week table.</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li>Switch attendance chart between <strong>Current month</strong> and <strong>Previous month</strong>.</li>
+      <li>Open <strong>Apply Leave</strong> from Leave balances.</li>
+      <li>Open a historical <strong>Payslip</strong> (print / save as PDF).</li>
+      <li>Switch team widget tabs between <strong>My Team</strong> and <strong>My Managers</strong> (view only).</li>
+      <li>Receive pulsing <strong>notification bell</strong> alerts for news and leave decisions.</li>
+    </ul>
+  </section>
+
+  <!-- 2 My Info Overview -->
+  <section class="screen">
+    <div class="badge">Screen 02</div>
+    <h2 class="section">My Info — Overview</h2>
+    <p>
+      My Info is the employee’s profile hub. The Overview tab summarizes today’s attendance,
+      organizational placement, and assigned company assets.
+    </p>
+    <img class="shot" src="images/02-myinfo-overview.jpg" alt="My Info Overview" />
+    <p class="caption">Figure 2 — My Info · Overview tab</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li><strong>Profile sidebar:</strong> Name, designation, tenure, Emp Code, team, joining date, reports-to, email, phone.</li>
+      <li><strong>Today’s snapshot:</strong> Status, check-in, check-out, and hours for the current workday.</li>
+      <li><strong>Work details:</strong> Department, designation, role, shift, team, and manager (tagged for clarity).</li>
+      <li><strong>Assigned assets:</strong> Preview of company assets (e.g. laptop, headset, access card).</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li>Switch tabs: Overview · Personal · Assets · Leaves.</li>
+      <li>Use <strong>View all</strong> on assets to open the full Assets tab.</li>
+      <li>Verify day-to-day punch context without leaving the profile area.</li>
+    </ul>
+  </section>
+
+  <!-- 3 Personal -->
+  <section class="screen">
+    <div class="badge">Screen 03</div>
+    <h2 class="section">My Info — Personal</h2>
+    <p>
+      The Personal tab presents HR master-data fields the employee may need for verification
+      (contact, identity, and emergency contact). Presentation uses Softnox tag styling for readability.
+    </p>
+    <img class="shot" src="images/03-myinfo-personal.jpg" alt="My Info Personal" />
+    <p class="caption">Figure 3 — My Info · Personal tab</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li><strong>Basic information:</strong> Phone, email, gender, date of birth, joining date, employee ID.</li>
+      <li><strong>Personal information:</strong> CNIC, nationality, religion, marital status, full department path, serial no.</li>
+      <li><strong>Emergency contact:</strong> Primary contact and phone.</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li>Review personal HR record for accuracy (view-oriented self-service).</li>
+      <li>Navigate back to Overview / Assets / Leaves tabs as needed.</li>
+    </ul>
+    <div class="box">
+      <strong>Note for leadership:</strong> This screen is designed for transparency — employees can confirm
+      Softnox has the correct identity and contact details on file.
+    </div>
+  </section>
+
+  <!-- 4 Leaves -->
+  <section class="screen">
+    <div class="badge">Screen 04</div>
+    <h2 class="section">My Info — Leaves</h2>
+    <p>
+      The Leaves tab shows remaining leave balances against Softnox quota policy and a history
+      of recent leave requests with status (Pending / Approved / Rejected).
+    </p>
+    <img class="shot" src="images/04-myinfo-leaves.jpg" alt="My Info Leaves" />
+    <p class="caption">Figure 4 — My Info · Leaves tab</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li><strong>Balances:</strong> Casual, Annual, and Sick remaining days (synced from Softnox leave sheet / policy).</li>
+      <li><strong>Counters:</strong> Pending, Approved, and Rejected request counts.</li>
+      <li><strong>Recent requests:</strong> Type, date range, days, and decision status.</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li>Click <strong>Apply leave →</strong> to open the Apply Leave form.</li>
+      <li>Track whether Softnox admin has approved or rejected prior requests.</li>
+    </ul>
+  </section>
+
+  <!-- 5 Apply Leave -->
+  <section class="screen">
+    <div class="badge">Screen 05</div>
+    <h2 class="section">Apply Leave</h2>
+    <p>
+      Apply Leave is the transaction screen where an employee submits a leave request for Softnox
+      admin review. Balances are shown at the top; request history sits beside the form.
+    </p>
+    <img class="shot" src="images/05-apply-leave.jpg" alt="Apply Leave" />
+    <p class="caption">Figure 5 — Apply Leave form and request history</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li>Live leave balance cards (Casual / Annual / Sick).</li>
+      <li>Own leave request table with type, dates, days, reason, and status.</li>
+      <li>Notification feed when a leave is approved or rejected.</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li>Select leave type: <strong>Sick, Casual, Annual, Unpaid</strong>.</li>
+      <li>Choose duration: Full Day or Half Day (days auto-calculate).</li>
+      <li>Set Leave From / Leave To dates and enter a required reason.</li>
+      <li>Optionally attach a supporting file (noted for later full upload release).</li>
+      <li>Submit the request for Softnox admin approval workflow.</li>
+    </ul>
+  </section>
+
+  <!-- 6 Payslip -->
+  <section class="screen">
+    <div class="badge">Screen 06</div>
+    <h2 class="section">Employee Payslip (View / Print / PDF)</h2>
+    <p>
+      From the Dashboard payslip widget, an employee opens a Softnox-branded payslip for a past month.
+      The layout mirrors Softnox payroll communication: earnings, deductions, net pay, tax, loans, and leave balances.
+    </p>
+    <img class="shot" src="images/06-payslip.jpg" alt="Employee Payslip" />
+    <p class="caption">Figure 6 — Softnox Employee Payslip viewer</p>
+
+    <h3>What the employee can see</h3>
+    <ul>
+      <li>Company header, print date, and payslip month.</li>
+      <li>Employee code, name, department, designation, joining date, monthly salary.</li>
+      <li>Earnings (e.g. Basic, Medical) and deductions (e.g. EOBI, Income Tax).</li>
+      <li>Net payment in PKR and amount in words.</li>
+      <li>Loan balances and leave balances snapshot.</li>
+    </ul>
+
+    <h3>What the employee can do</h3>
+    <ul>
+      <li><strong>Print</strong> the payslip.</li>
+      <li><strong>PDF</strong> — save via browser Print → Save as PDF (professional charcoal theme).</li>
+      <li><strong>Email</strong> — reserved for a later Softnox release.</li>
+    </ul>
+  </section>
+
+  <!-- Checklist -->
+  <section class="screen">
+    <h2 class="section">7. Employee Capability Checklist</h2>
+    <p>At a glance — what one Softnox employee can accomplish in FlowHCM:</p>
+    <table class="meta-table" style="max-width:100%">
+      <tr><th>Capability</th><td>Available on employee portal</td></tr>
+      <tr><th>View attendance KPIs &amp; monthly chart</th><td>Yes — Dashboard</td></tr>
+      <tr><th>View today punch &amp; month hours progress</th><td>Yes — Dashboard</td></tr>
+      <tr><th>View team / managers (read-only)</th><td>Yes — Dashboard</td></tr>
+      <tr><th>Read company announcements</th><td>Yes — Dashboard</td></tr>
+      <tr><th>View leave balances</th><td>Yes — Dashboard / My Info / Apply Leave</td></tr>
+      <tr><th>Apply for leave</th><td>Yes — Apply Leave</td></tr>
+      <tr><th>Track leave request status</th><td>Yes — Apply Leave / My Info · Leaves</td></tr>
+      <tr><th>View profile &amp; personal HR data</th><td>Yes — My Info</td></tr>
+      <tr><th>View assigned assets</th><td>Yes — My Info · Assets</td></tr>
+      <tr><th>View / print / PDF payslip</th><td>Yes — Dashboard payslip widget</td></tr>
+      <tr><th>Receive leave &amp; news notifications</th><td>Yes — Header bell</td></tr>
+    </table>
+
+    <h2 class="section" style="margin-top:28px">8. Closing Note</h2>
+    <p>
+      The Softnox FlowHCM employee portal is designed as a <strong>self-service window</strong>:
+      employees stay informed on attendance, leave, payslips, assets, and announcements without
+      needing admin tools. Admin-only functions (approvals, payroll operations, roster management)
+      remain outside this document’s scope.
+    </p>
+    <p class="footer-note">
+      Softnox Technologies (Pvt) Ltd · FlowHCM Employee Portal Functional Report · September 2026
+    </p>
+  </section>
+
+</body>
+</html>

@@ -119,9 +119,9 @@ export default function MyInfo() {
   }
 
   const balances = [
-    { key: "casual", label: "Casual", value: data.balances?.casual ?? 0, color: "#2563eb", max: 10 },
-    { key: "annual", label: "Annual", value: data.balances?.annual ?? 0, color: "#7c3aed", max: 14 },
-    { key: "sick", label: "Sick", value: data.balances?.sick ?? 0, color: "#f59e0b", max: 8 },
+    { key: "casual", label: "Casual", value: data.balances?.casual ?? 0, color: "#2563eb", max: 6 },
+    { key: "annual", label: "Annual", value: data.balances?.annual ?? 0, color: "#7c3aed", max: 8 },
+    { key: "sick", label: "Sick", value: data.balances?.sick ?? 0, color: "#f59e0b", max: 6 },
   ];
 
   return (

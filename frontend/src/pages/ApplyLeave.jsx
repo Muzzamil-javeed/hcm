@@ -133,7 +133,7 @@ export default function ApplyLeave() {
             <Progress
               percent={Math.min(
                 100,
-                (Number(b.balance) / (b.type === "annual" ? 14 : b.type === "sick" ? 8 : 10)) * 100
+                (Number(b.balance) / (b.type === "annual" ? 8 : 6)) * 100
               )}
               showInfo={false}
               size="small"

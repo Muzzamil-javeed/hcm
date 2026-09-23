@@ -86,7 +86,7 @@ export async function importEmployeesFromExcel(filePath = defaultRosterPath(), {
     );
     await LeaveBalance.findOneAndUpdate(
       { empId: emp.empId },
-      { $setOnInsert: { empId: emp.empId, casual: 10, annual: 14, sick: 8 } },
+      { $setOnInsert: { empId: emp.empId, casual: 6, annual: 8, sick: 6 } },
       { upsert: true }
     );
     upserted += 1;

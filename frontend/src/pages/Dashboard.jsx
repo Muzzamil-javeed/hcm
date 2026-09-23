@@ -7,8 +7,11 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   DollarOutlined,
+  EnvironmentOutlined,
+  GlobalOutlined,
   LineChartOutlined,
   NotificationOutlined,
+  PhoneOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -261,25 +264,58 @@ export default function Dashboard() {
       </section>
 
       <section className="ed-flags-row">
-        <aside className="ed-profile ed-enter" style={{ animationDelay: "280ms" }}>
-          <button
-            type="button"
-            className="ed-dp-btn"
-            title="Open My Info"
-            onClick={() => navigate("/info")}
-          >
-            <Avatar size={72} style={{ background: hashColor(emp.empId), fontSize: 26 }}>
-              {initials(emp.name || user?.name)}
-            </Avatar>
-          </button>
-          <h2>{emp.name || user?.name}</h2>
-          <Tag className="ed-role-tag">{emp.jobTitle || "Employee"}</Tag>
-          <ul className="ed-info">
-            <li><span>Employee ID</span><b>{emp.empId}</b></li>
-            <li><span>Department</span><b>{emp.department || "—"}</b></li>
-            <li><span>Team</span><b>{emp.team || "—"}</b></li>
-            <li><span>Shift</span><b>{emp.shift || data.today?.shiftName || "—"}</b></li>
-          </ul>
+        <aside className="ed-idcard ed-enter" style={{ animationDelay: "280ms" }} title="Hover to flip · click photo for My Info">
+          <div className="ed-idcard-inner">
+            <div className="ed-idcard-face ed-idcard-front">
+              <div className="ed-id-brand">
+                <span className="ed-id-logo"><b>soft</b>nox</span>
+                <small>Technologies Pvt Ltd</small>
+              </div>
+              <button
+                type="button"
+                className="ed-id-dp"
+                aria-label="Open My Info"
+                onClick={() => navigate("/info")}
+              >
+                <span className="ed-id-dp-ring">
+                  {initials(emp.name || user?.name)}
+                </span>
+              </button>
+              <h2>{(emp.name || user?.name || "").toUpperCase()}</h2>
+              <p className="ed-id-title">{(emp.jobTitle || "Employee").toUpperCase()}</p>
+              <div className="ed-id-front-meta">
+                <p><strong>Employee ID:</strong> {emp.empId || "—"}</p>
+                <p><strong>Email:</strong> {emp.email || user?.email || "hr@softnoxtechnologies.net"}</p>
+              </div>
+              <em className="ed-id-hint">Hover to flip</em>
+            </div>
+
+            <div className="ed-idcard-face ed-idcard-back">
+              <div className="ed-id-brand light">
+                <span className="ed-id-logo"><b>soft</b>nox</span>
+                <small>Technologies Pvt Ltd</small>
+              </div>
+              <ul className="ed-id-back-list">
+                <li>
+                  <PhoneOutlined />
+                  <span>{emp.mobile || "0334-1229901"}</span>
+                </li>
+                <li>
+                  <GlobalOutlined />
+                  <span>www.softnoxtechnologies.com</span>
+                </li>
+                <li>
+                  <EnvironmentOutlined />
+                  <span>Plot 8 B, 203, SMCHS Block A, Karachi, Sindh 75400</span>
+                </li>
+              </ul>
+              <div className="ed-id-terms">
+                <b>Terms &amp; Conditions</b>
+                <p>When lost please return to 2nd floor suite number #203.</p>
+                <p>Bring this card daily at your office premises in order to be mark present.</p>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <article className="ed-panel ed-flags ed-enter" style={{ animationDelay: "320ms" }}>
@@ -442,7 +478,7 @@ export default function Dashboard() {
                 <div>
                   <b>{b.label}</b>
                   <Progress
-                    percent={Math.min(100, (Number(b.balance) / 14) * 100)}
+                    percent={Math.min(100, (Number(b.balance) / (b.type === "annual" ? 8 : 6)) * 100)}
                     showInfo={false}
                     size="small"
                     strokeColor={b.type === "sick" ? "#f59e0b" : b.type === "annual" ? "#7c3aed" : "#2563eb"}

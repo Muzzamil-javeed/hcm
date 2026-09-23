@@ -144,9 +144,9 @@ router.post("/employees", async (req, res) => {
     { empId },
     {
       empId,
-      casual: Number(bal.casual ?? 10),
-      annual: Number(bal.annual ?? 14),
-      sick: Number(bal.sick ?? 8),
+      casual: Number(bal.casual ?? 6),
+      annual: Number(bal.annual ?? 8),
+      sick: Number(bal.sick ?? 6),
     },
     { upsert: true, new: true },
   );
@@ -237,7 +237,7 @@ router.get("/employees/:empId", async (req, res) => {
     },
     balances: balance
       ? { casual: balance.casual, annual: balance.annual, sick: balance.sick }
-      : { casual: 10, annual: 14, sick: 8 },
+      : { casual: 6, annual: 8, sick: 6 },
     leaveCounts: {
       pending: leaveCounts.pending || 0,
       approved: leaveCounts.approved || 0,
@@ -978,6 +978,12 @@ router.get("/documents", async (_req, res) => {
   });
   rows.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
   res.json({ total: rows.length, documents: rows });
+});
+
+router.post("/sync-leave-balances", async (_req, res) => {
+  const { updateLeaveBalancesFromSheet } = await import("../scripts/updateLeaveBalances.js");
+  const result = await updateLeaveBalancesFromSheet({ disconnect: false });
+  res.json({ ok: true, ...result });
 });
 
 router.get("/payroll", async (_req, res) => {

@@ -243,7 +243,7 @@ async function upsertEmployees(users, punches) {
     if (existing?.source === "roster") {
       await LeaveBalance.findOneAndUpdate(
         { empId },
-        { $setOnInsert: { empId, casual: 10, annual: 14, sick: 8 } },
+        { $setOnInsert: { empId, casual: 6, annual: 8, sick: 6 } },
         { upsert: true }
       );
       continue;
@@ -273,7 +273,7 @@ async function upsertEmployees(users, punches) {
     );
     await LeaveBalance.findOneAndUpdate(
       { empId },
-      { $setOnInsert: { empId, casual: 10, annual: 14, sick: 8 } },
+      { $setOnInsert: { empId, casual: 6, annual: 8, sick: 6 } },
       { upsert: true }
     );
   }

@@ -285,9 +285,9 @@ router.get("/profile", authRequired, async (req, res) => {
       checkOutLabel: to12h(todayClassified.checkOut),
     },
     balances: {
-      casual: Number(balance?.casual ?? 10),
-      annual: Number(balance?.annual ?? 14),
-      sick: Number(balance?.sick ?? 8),
+      casual: Number(balance?.casual ?? 6),
+      annual: Number(balance?.annual ?? 8),
+      sick: Number(balance?.sick ?? 6),
     },
     leaveCounts: {
       pending: leaveCounts.pending || 0,
@@ -434,9 +434,9 @@ function buildPayslip(employee, balance, year, monthIndex, { expected = false } 
       netWords: amountInWords(net),
     },
     leaveBalances: {
-      casual: Number(balance?.casual ?? 10),
-      annual: Number(balance?.annual ?? 14),
-      sick: Number(balance?.sick ?? 8),
+      casual: Number(balance?.casual ?? 6),
+      annual: Number(balance?.annual ?? 8),
+      sick: Number(balance?.sick ?? 6),
     },
     loanBalances: [{ label: "Soft Loan", amount: 0 }],
   };

@@ -206,8 +206,7 @@ export async function seedDatabase({ disconnect = true } = {}) {
   }
 
   const balances = empIds.map((empId) => {
-    if (empId === "112") return { empId, casual: 0, annual: 0, sick: 1 };
-    return { empId, casual: 10, annual: 14, sick: 8 };
+    return { empId, casual: 6, annual: 8, sick: 6 };
   });
   await LeaveBalance.insertMany(balances);
 

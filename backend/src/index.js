@@ -62,6 +62,11 @@ await connectDb(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/flowhcm");
     const roster = defaultRosterPath();
     const result = await importEmployeesFromExcel(roster);
     console.log(`Roster import: ${result.upserted} employees (total ${result.total})`);
+    const { updateLeaveBalancesFromSheet } = await import("./scripts/updateLeaveBalances.js");
+    const leaveResult = await updateLeaveBalancesFromSheet({ disconnect: false });
+    console.log(
+      `Leave sheet sync: matched ${leaveResult.matched}/${leaveResult.total} (special ${leaveResult.special})`
+    );
   } catch (err) {
     console.warn("Roster import skipped:", err.message);
   }
