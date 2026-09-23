@@ -1,21 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  App as AntApp,
   Avatar,
   Button,
   DatePicker,
   Dropdown,
+  Input,
   Select,
   Spin,
   Tag,
+  Upload,
 } from "antd";
 import {
   CalendarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  FileTextOutlined,
+  PaperClipOutlined,
   GiftOutlined,
   HomeOutlined,
+  NotificationOutlined,
   PlusOutlined,
   TeamOutlined,
   TrophyOutlined,
@@ -40,7 +48,8 @@ import {
   YAxis,
 } from "recharts";
 import dayjs from "dayjs";
-import api from "../api";
+import api, { openAnnouncementPdf } from "../api";
+import LeaveDetailModal from "../components/LeaveDetailModal";
 import { useAuth } from "../context/AuthContext";
 
 const { RangePicker } = DatePicker;
@@ -74,6 +83,7 @@ function ChartTip({ active, payload, label }) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { message, modal } = AntApp.useApp();
   const navigate = useNavigate();
   const [range, setRange] = useState([dayjs().startOf("month"), dayjs()]);
   const [emp, setEmp] = useState();
@@ -82,7 +92,22 @@ export default function AdminDashboard() {
   const [attRange, setAttRange] = useState("6m");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const isHr = Boolean(user?.isHr);
+  const base = isHr ? "/hr" : "/admin";
   const firstName = (user?.name || "Admin").split(" ")[0];
+  const [hrQueue, setHrQueue] = useState({ pending: [], withAdmin: 0, docs: [] });
+  const [announcements, setAnnouncements] = useState([]);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annBody, setAnnBody] = useState("");
+  const [annFrom, setAnnFrom] = useState(null);
+  const [annTo, setAnnTo] = useState(null);
+  const [annPdf, setAnnPdf] = useState(null);
+  const [annPdfName, setAnnPdfName] = useState("");
+  const [annSaving, setAnnSaving] = useState(false);
+  const [editingAnnId, setEditingAnnId] = useState(null);
+  const [leaveDetail, setLeaveDetail] = useState(null);
+  const [leaveActing, setLeaveActing] = useState();
+  const [queueTick, setQueueTick] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -99,6 +124,35 @@ export default function AdminDashboard() {
   useEffect(() => {
     load().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isHr) return;
+    (async () => {
+      try {
+        const [leaves, people, notes] = await Promise.all([
+          api.get("/admin/leaves", { params: { status: "pending" } }),
+          api.get("/admin/employees"),
+          api.get("/admin/announcements"),
+        ]);
+        setAnnouncements(notes.data.announcements || []);
+        const docs = (people.data.employees || [])
+          .map((empRow) => {
+            const items = Array.isArray(empRow.documentItems) ? empRow.documentItems : [];
+            const missing = items.filter((d) => d?.name && !d.received).map((d) => d.name);
+            return missing.length ? { ...empRow, missing } : null;
+          })
+          .filter(Boolean)
+          .slice(0, 6);
+        setHrQueue({
+          pending: leaves.data.requests || [],
+          withAdmin: leaves.data.counts?.hr_approved || 0,
+          docs,
+        });
+      } catch {
+        setHrQueue({ pending: [], withAdmin: 0, docs: [] });
+      }
+    })();
+  }, [isHr, queueTick]);
 
   const kpis = useMemo(() => {
     const k = data?.kpis || {};
@@ -141,7 +195,21 @@ export default function AdminDashboard() {
   function openEmp(empId, e) {
     e?.stopPropagation?.();
     if (!empId) return;
-    navigate(`/admin/employees/${empId}`);
+    navigate(`${base}/employees/${empId}`);
+  }
+
+  async function decideLeave(id, next) {
+    setLeaveActing(id);
+    try {
+      await api.patch(`/leaves/${id}`, { status: next });
+      message.success(next === "rejected" ? "Leave rejected" : "Sent to Admin for final approval");
+      setLeaveDetail(null);
+      setQueueTick((n) => n + 1);
+    } catch (err) {
+      message.error(err.response?.data?.message || "Update failed");
+    } finally {
+      setLeaveActing(undefined);
+    }
   }
 
   function EmpDp({ empId, name, color, size = 30, title }) {
@@ -178,11 +246,21 @@ export default function AdminDashboard() {
     });
   }, [productivity.attendanceRate]);
 
-  const quickItems = [
-    { key: "emp", label: "View Employees" },
-    { key: "leave", label: "Approve Leaves" },
-    { key: "att", label: "View Attendance" },
-  ];
+  const quickItems = isHr
+    ? [
+        { key: "add", label: "Add Employee" },
+        { key: "leave", label: "Approve Leaves" },
+        { key: "att", label: "View Attendance" },
+        { key: "emp", label: "View Employees" },
+      ]
+    : [
+        { key: "emp", label: "View Employees" },
+        { key: "leave", label: "Approve Leaves" },
+        { key: "att", label: "View Attendance" },
+      ];
+
+  const employeeAnnouncements = announcements.filter((a) => a.audience !== "admin");
+  const latestAnn = employeeAnnouncements[0];
 
   if (loading && !data) {
     return (
@@ -199,7 +277,7 @@ export default function AdminDashboard() {
           <h1>
             {greeting()}, {firstName}! <span aria-hidden>👋</span>
           </h1>
-          <p>Here&apos;s what&apos;s happening in your organization today.</p>
+          <p>{isHr ? "Approve leave first, add employees, and keep documents in order." : "Here's what's happening in your organization today."}</p>
         </div>
         <div className="ad-hero-actions ad-enter" style={{ animationDelay: "90ms" }}>
           <RangePicker value={range} onChange={(v) => v && setRange(v)} allowClear={false} className="ad-range" />
@@ -209,7 +287,7 @@ export default function AdminDashboard() {
             value={emp}
             onChange={(id) => {
               setEmp(id);
-              if (id) navigate(`/admin/employees/${id}`);
+              if (id) navigate(`${base}/employees/${id}`);
             }}
             placeholder="Select Employee"
             prefix={<UserOutlined />}
@@ -232,7 +310,7 @@ export default function AdminDashboard() {
             dropdownRender={(menu) => (
               <>
                 {menu}
-                <button type="button" className="ad-emp-footer" onClick={() => navigate("/admin/employees")}>
+                <button type="button" className="ad-emp-footer" onClick={() => navigate(`${base}/employees`)}>
                   View All Employees →
                 </button>
               </>
@@ -242,9 +320,10 @@ export default function AdminDashboard() {
             menu={{
               items: quickItems,
               onClick: ({ key }) => {
-                if (key === "leave") navigate("/admin/leaves");
-                else if (key === "att") navigate("/admin/attendance");
-                else if (key === "emp") navigate("/admin/employees");
+                if (key === "add") navigate("/hr/employees/new");
+                else if (key === "leave") navigate(`${base}/leaves`);
+                else if (key === "att") navigate(`${base}/attendance`);
+                else if (key === "emp") navigate(`${base}/employees`);
               },
             }}
           >
@@ -269,6 +348,303 @@ export default function AdminDashboard() {
           </article>
         ))}
       </section>
+
+      {isHr ? (
+        <>
+        <section className="ad-bottom">
+          <article className="ad-panel ad-enter" style={{ animationDelay: "480ms" }}>
+            <header className="ad-panel-head">
+              <h3>Leave requests for you</h3>
+              <button type="button" className="ad-link" onClick={() => navigate("/hr/leaves")}>Open queue →</button>
+            </header>
+            <ul className="ad-who">
+              {hrQueue.pending.length === 0 && <li className="muted" style={{ display: "block", padding: 16 }}>No new leave requests.</li>}
+              {hrQueue.pending.slice(0, 6).map((row) => (
+                <li key={row._id} className="ad-who-click" onClick={() => setLeaveDetail(row)}>
+                  <div className="ad-who-emp">
+                    <button type="button" className="ad-name-link" onClick={() => setLeaveDetail(row)}>
+                      <b>{row.employeeName}</b>
+                      <small>{row.type} · {row.days} day(s)</small>
+                    </button>
+                  </div>
+                  <span className="muted">{row.fromDate}</span>
+                  <span className="ad-mono">{row.toDate}</span>
+                  <Tag className="ad-tag late">With HR</Tag>
+                </li>
+              ))}
+            </ul>
+          </article>
+
+          <article className="ad-panel ad-enter" style={{ animationDelay: "540ms" }}>
+            <header className="ad-panel-head">
+              <h3>Waiting for Admin</h3>
+              <button type="button" className="ad-link" onClick={() => navigate("/hr/leaves")}>View leaves →</button>
+            </header>
+            <div className="ad-need-chips">
+              <article>
+                <span>With HR</span>
+                <strong>{hrQueue.pending.length}</strong>
+              </article>
+              <article>
+                <span>With Admin</span>
+                <strong>{hrQueue.withAdmin}</strong>
+              </article>
+              <article>
+                <span>Docs open</span>
+                <strong>{hrQueue.docs.length}</strong>
+              </article>
+            </div>
+            <p className="muted" style={{ margin: "12px 0 0" }}>You approve first. Admin gives the final approval.</p>
+            <Button type="primary" icon={<UserAddOutlined />} style={{ marginTop: 14 }} onClick={() => navigate("/hr/employees/new")}>
+              Add Employee
+            </Button>
+          </article>
+
+          <article className="ad-panel ad-enter" style={{ animationDelay: "600ms" }}>
+            <header className="ad-panel-head">
+              <h3><FileTextOutlined /> Document checklist</h3>
+              <button type="button" className="ad-link" onClick={() => navigate("/hr/employees")}>All employees →</button>
+            </header>
+            <ul className="ad-need-list">
+              {hrQueue.docs.length === 0 && <li className="muted" style={{ display: "block", padding: 12 }}>No open document checks.</li>}
+              {hrQueue.docs.map((row) => (
+                <li key={row.empId}>
+                  <button type="button" className="ad-name-link" onClick={() => openEmp(row.empId)}>
+                    <b>{row.name}</b>
+                    <small>{row.missing.join(" · ")} missing</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </section>
+
+        <article className="ad-panel hr-ann-panel ad-enter" style={{ animationDelay: "640ms" }}>
+          <header className="ad-panel-head">
+            <h3><NotificationOutlined /> Announcements</h3>
+            <button type="button" className="ad-link" onClick={() => navigate("/hr/announcements")}>Manage →</button>
+          </header>
+          <div className="hr-ann-body">
+            <div className="hr-ann-form">
+              <p className="hr-ann-kicker">{editingAnnId ? "Edit post" : "New post"}</p>
+              <p className="muted">Employees see this on their dashboard and in the bell.</p>
+              <Input
+                value={annTitle}
+                onChange={(e) => setAnnTitle(e.target.value)}
+                placeholder="Title"
+                maxLength={120}
+              />
+              <Input.TextArea
+                value={annBody}
+                onChange={(e) => setAnnBody(e.target.value)}
+                placeholder="Write the announcement for employees"
+                rows={4}
+                maxLength={2000}
+              />
+              <div className="hr-ann-dates">
+                <DatePicker
+                  value={annFrom}
+                  onChange={(value) => {
+                    setAnnFrom(value);
+                    if (value && annTo && annTo.isBefore(value, "day")) setAnnTo(value);
+                  }}
+                  format="DD MMM YYYY"
+                  placeholder="Show from"
+                  style={{ width: "100%" }}
+                />
+                <DatePicker
+                  value={annTo}
+                  onChange={setAnnTo}
+                  format="DD MMM YYYY"
+                  placeholder="Show until"
+                  style={{ width: "100%" }}
+                  disabledDate={(current) => (annFrom ? current && current.isBefore(annFrom, "day") : false)}
+                />
+              </div>
+              <p className="muted">After the end date, the post and its notification are removed automatically.</p>
+              <div className="hr-ann-pdf">
+                <Upload
+                  accept="application/pdf,.pdf"
+                  maxCount={1}
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                    if (!isPdf) {
+                      message.error("Only PDF allowed");
+                      return false;
+                    }
+                    if (file.size > 4 * 1024 * 1024) {
+                      message.error("PDF must be under 4 MB");
+                      return false;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setAnnPdf({ name: file.name, data: String(reader.result || "") });
+                      setAnnPdfName(file.name);
+                    };
+                    reader.readAsDataURL(file);
+                    return false;
+                  }}
+                >
+                  <Button icon={<PaperClipOutlined />}>Upload PDF</Button>
+                </Upload>
+                <em>{annPdfName || "No PDF. Policy files must be PDF."}</em>
+                {annPdfName ? (
+                  <button type="button" className="hr-ann-cancel" onClick={() => { setAnnPdf({ name: "", data: "" }); setAnnPdfName(""); }}>
+                    Remove PDF
+                  </button>
+                ) : null}
+              </div>
+              <Button
+                type="primary"
+                loading={annSaving}
+                onClick={async () => {
+                  const title = annTitle.trim();
+                  const body = annBody.trim();
+                  if (!title || !body) return;
+                  if (!annFrom || !annTo) {
+                    message.error("Choose a show from date and a show until date.");
+                    return;
+                  }
+                  const payload = {
+                    title,
+                    body,
+                    audience: "employees",
+                    startDate: annFrom.format("YYYY-MM-DD"),
+                    endDate: annTo.format("YYYY-MM-DD"),
+                  };
+                  if (annPdf) {
+                    payload.documentName = annPdf.name;
+                    payload.documentData = annPdf.data;
+                  }
+                  setAnnSaving(true);
+                  try {
+                    if (editingAnnId) {
+                      await api.patch(`/admin/announcements/${editingAnnId}`, payload);
+                      message.success("Announcement updated");
+                    } else {
+                      await api.post("/admin/announcements", payload);
+                      message.success("Announcement published");
+                    }
+                    setAnnTitle("");
+                    setAnnBody("");
+                    setAnnFrom(null);
+                    setAnnTo(null);
+                    setAnnPdf(null);
+                    setAnnPdfName("");
+                    setEditingAnnId(null);
+                    const { data: notes } = await api.get("/admin/announcements");
+                    setAnnouncements(notes.announcements || []);
+                  } catch (err) {
+                    message.error(err.response?.data?.message || "Could not save announcement");
+                  } finally {
+                    setAnnSaving(false);
+                  }
+                }}
+              >
+                {editingAnnId ? "Save changes" : "Publish to employees"}
+              </Button>
+              {editingAnnId ? (
+                <button
+                  type="button"
+                  className="hr-ann-cancel"
+                  onClick={() => {
+                    setEditingAnnId(null);
+                    setAnnTitle("");
+                    setAnnBody("");
+                    setAnnFrom(null);
+                    setAnnTo(null);
+                    setAnnPdf(null);
+                    setAnnPdfName("");
+                  }}
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
+            <div className="hr-ann-side">
+              <p className="hr-ann-kicker">Employee preview</p>
+              <article className="hr-ann-preview">
+                <span className="hr-ann-preview-dot" />
+                <div>
+                  <b>{annTitle.trim() || latestAnn?.title || "Announcement title"}</b>
+                  <p>{annBody.trim() || latestAnn?.body || "Your message will show here, the same way employees see it."}</p>
+                  <small>
+                    {annFrom && annTo
+                      ? `${annFrom.format("DD MMM YYYY")} → ${annTo.format("DD MMM YYYY")}`
+                      : annTitle.trim() || annBody.trim()
+                        ? "Draft · pick show from and show until"
+                        : "Latest live post"}
+                  </small>
+                </div>
+              </article>
+              <ul className="hr-ann-list">
+                {employeeAnnouncements.slice(0, 5).map((a) => (
+                  <li key={a._id} className={editingAnnId === a._id ? "is-editing" : ""}>
+                    <b>{a.title}</b>
+                    <small>{a.body}</small>
+                    <em>
+                      {a.startDate && a.endDate
+                        ? `${dayjs(a.startDate).format("DD MMM YYYY")} → ${dayjs(a.endDate).format("DD MMM YYYY")}`
+                        : a.createdAt ? dayjs(a.createdAt).format("DD MMM YYYY") : ""}
+                    </em>
+                    {a.documentName ? (
+                      <button type="button" className="hr-ann-pdf-link" onClick={() => openAnnouncementPdf(a._id)}>
+                        <PaperClipOutlined /> {a.documentName}
+                      </button>
+                    ) : null}
+                    <div className="hr-ann-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAnnId(a._id);
+                          setAnnTitle(a.title || "");
+                          setAnnBody(a.body || "");
+                          setAnnFrom(a.startDate ? dayjs(a.startDate) : null);
+                          setAnnTo(a.endDate ? dayjs(a.endDate) : null);
+                          setAnnPdf(null);
+                          setAnnPdfName(a.documentName || "");
+                        }}
+                      >
+                        <EditOutlined /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => {
+                          modal.confirm({
+                            title: "Delete this announcement?",
+                            content: "This post will be removed from HR, employees, and the notification bell.",
+                            okText: "Delete",
+                            okButtonProps: { danger: true },
+                            cancelText: "Cancel",
+                            onOk: async () => {
+                              await api.delete(`/admin/announcements/${a._id}`);
+                              if (editingAnnId === a._id) {
+                                setEditingAnnId(null);
+                                setAnnTitle("");
+                                setAnnBody("");
+                                setAnnFrom(null);
+                                setAnnTo(null);
+                              }
+                              setAnnouncements((list) => list.filter((item) => item._id !== a._id));
+                              message.success("Announcement deleted");
+                            },
+                          });
+                        }}
+                      >
+                        <DeleteOutlined /> Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+                {!employeeAnnouncements.length && <li className="muted">No announcements yet.</li>}
+              </ul>
+            </div>
+          </div>
+        </article>
+        </>
+      ) : null}
 
       <section className="ad-bottom">
         <article className="ad-panel ad-enter" style={{ animationDelay: "560ms" }}>
@@ -327,7 +703,7 @@ export default function AdminDashboard() {
         <article className="ad-panel ad-enter" style={{ animationDelay: "640ms" }}>
           <header className="ad-panel-head">
             <h3>Who&apos;s In Today?</h3>
-            <button type="button" className="ad-link" onClick={() => navigate("/admin/attendance")}>View All →</button>
+            <button type="button" className="ad-link" onClick={() => navigate(`${base}/attendance`)}>View All →</button>
           </header>
           <div className="ad-table-head">
             <span>Employee</span>
@@ -356,7 +732,7 @@ export default function AdminDashboard() {
         <article className="ad-panel ad-enter" style={{ animationDelay: "720ms" }}>
           <header className="ad-panel-head">
             <h3>Needs Attention</h3>
-            <button type="button" className="ad-link" onClick={() => navigate("/admin/attendance")}>View All →</button>
+            <button type="button" className="ad-link" onClick={() => navigate(`${base}/attendance`)}>View All →</button>
           </header>
           <div className="ad-need-chips">
             <article>
@@ -590,7 +966,7 @@ export default function AdminDashboard() {
               <div className="ad-chart-card">
                 <header className="ad-panel-head">
                   <h4>Top Attendance Exceptions</h4>
-                  <button type="button" className="ad-link" onClick={() => navigate("/admin/attendance")}>View All →</button>
+                  <button type="button" className="ad-link" onClick={() => navigate(`${base}/attendance`)}>View All →</button>
                 </header>
                 <div className="ad-exc-head">
                   <span>Employee</span>
@@ -673,6 +1049,16 @@ export default function AdminDashboard() {
           </article>
         </aside>
       </section>
+
+      <LeaveDetailModal
+        row={leaveDetail}
+        onClose={() => setLeaveDetail(null)}
+        canDecide={leaveDetail?.status === "pending"}
+        approveLabel="HR approve"
+        acting={leaveActing}
+        onDecide={decideLeave}
+        onOpenProfile={openEmp}
+      />
 
       <footer className="ad-page-footer ad-enter" style={{ animationDelay: "1100ms" }}>
         <span>© 2026 Softnox Technologies. All rights reserved.</span>

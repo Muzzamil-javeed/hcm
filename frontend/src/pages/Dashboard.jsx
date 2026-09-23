@@ -11,6 +11,7 @@ import {
   GlobalOutlined,
   LineChartOutlined,
   NotificationOutlined,
+  PaperClipOutlined,
   PhoneOutlined,
   TeamOutlined,
   UserOutlined,
@@ -27,7 +28,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import api from "../api";
+import api, { openAnnouncementPdf } from "../api";
 import { useAuth } from "../context/AuthContext";
 import PayslipViewer from "../components/PayslipViewer";
 
@@ -455,6 +456,11 @@ export default function Dashboard() {
                 <div>
                   <b>{a.title}</b>
                   <p>{a.body}</p>
+                  {a.documentName ? (
+                    <button type="button" className="hr-ann-pdf-link" onClick={() => openAnnouncementPdf(a.id)}>
+                      <PaperClipOutlined /> {a.documentName}
+                    </button>
+                  ) : null}
                   <small>
                     {a.createdAt ? new Date(a.createdAt).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
                     {a.createdBy ? ` · ${a.createdBy}` : ""}

@@ -44,3 +44,10 @@ export function adminRequired(req, res, next) {
   }
   next();
 }
+
+export function staffRequired(req, res, next) {
+  if (req.user?.role !== "admin" && req.user?.role !== "hr") {
+    return res.status(403).json({ message: "HR or Admin access only" });
+  }
+  next();
+}

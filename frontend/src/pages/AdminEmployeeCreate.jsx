@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   App as AntApp,
   AutoComplete,
@@ -8,6 +8,7 @@ import {
   Col,
   DatePicker,
   Divider,
+  Checkbox,
   Form,
   Input,
   InputNumber,
@@ -18,14 +19,60 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined,
+  CalendarOutlined,
   DeleteOutlined,
+  FileTextOutlined,
+  IdcardOutlined,
+  LaptopOutlined,
+  MailOutlined,
   PlusOutlined,
   SaveOutlined,
   UserAddOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import api from "../api";
+import { useAuth } from "../context/AuthContext";
 import AdminPage from "../components/AdminPage";
+
+const PROGRESS_FIELDS = [
+  "empId", "serialNo", "joiningDate", "name", "jobTitle", "department", "team", "role", "slot", "shift", "reportsTo",
+  "gender", "dateOfBirth", "maritalStatus", "cnicNo", "religion",
+  "casual", "annual", "sick",
+];
+
+function formProgress(values) {
+  const checks = PROGRESS_FIELDS.map((key) => fieldFilled(values[key]));
+  const emails = values.emails?.length ? values.emails : [{ value: "" }];
+  const mobiles = values.mobiles?.length ? values.mobiles : [{ value: "" }];
+  emails.forEach((row) => checks.push(fieldFilled(row?.value)));
+  mobiles.forEach((row) => checks.push(fieldFilled(row?.value)));
+  (values.documentItems || []).forEach((row) => checks.push(Boolean(row?.received) && fieldFilled(row?.name)));
+  (values.extraFields || []).forEach((row) => checks.push(fieldFilled(row?.label) && fieldFilled(row?.value)));
+  (values.assets || []).forEach((row) => checks.push(fieldFilled(row?.name)));
+  const done = checks.filter(Boolean).length;
+  return checks.length ? Math.round((done / checks.length) * 100) : 0;
+}
+
+function fieldFilled(value) {
+  if (value == null || value === false || value === "") return false;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (dayjs.isDayjs(value)) return value.isValid();
+  if (typeof value === "string") return value.trim().length > 0;
+  return Boolean(value);
+}
+
+function SectionTitle({ icon, tone, title, hint }) {
+  return (
+    <span className="emp-sec-title">
+      <span className={`emp-sec-ico tone-${tone}`}>{icon}</span>
+      <span>
+        <b>{title}</b>
+        {hint ? <small>{hint}</small> : null}
+      </span>
+    </span>
+  );
+}
 
 const ASSET_TYPES = [
   { value: "laptop", label: "Laptop" },
@@ -42,11 +89,15 @@ const ASSET_TYPES = [
 
 export default function AdminEmployeeCreate() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const base = user?.isHr ? "/hr" : "/admin";
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const watched = Form.useWatch([], form) || {};
+  const progress = formProgress(watched);
 
   useEffect(() => {
     (async () => {
@@ -57,23 +108,28 @@ export default function AdminEmployeeCreate() {
         form.setFieldsValue({
           empId: data.nextEmpId,
           serialNo: data.nextSerial,
-          role: "Member",
-          jobTitle: "Employee",
-          department: data.departments?.[0] || "Operations",
-          team: data.teams?.[0] || "General",
-          slot: data.slots?.[0] || "General Shift",
-          shift: data.slots?.[0] || "General Shift",
+          role: undefined,
+          jobTitle: "",
+          department: undefined,
+          team: undefined,
+          slot: undefined,
+          shift: "",
           joiningDate: dayjs(),
           gender: "",
           maritalStatus: "",
           religion: "",
-          casual: 10,
-          annual: 14,
-          sick: 8,
-          assets: [
-            { type: "laptop", name: "Dell Latitude Laptop", categoryCode: "AST-001", assignedBy: "Softnox IT" },
-            { type: "idcard", name: "Softnox Access Card", categoryCode: "ID-001", assignedBy: "Softnox IT" },
+          casual: 6,
+          sick: 6,
+          annual: 8,
+          emails: [{ value: "" }],
+          mobiles: [{ value: "" }],
+          documentItems: [
+            { name: "CNIC", received: false },
+            { name: "Utility Bill", received: false },
+            { name: "NDA signed", received: false },
           ],
+          extraFields: [],
+          assets: [],
         });
       } catch (err) {
         message.error(err.response?.data?.message || "Could not load form defaults");
@@ -102,8 +158,10 @@ export default function AdminEmployeeCreate() {
         dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format("YYYY-MM-DD") : "",
         cnicNo: values.cnicNo,
         religion: values.religion,
-        email: values.email,
-        mobile: values.mobile,
+        emails: (values.emails || []).filter((row) => row?.value),
+        mobiles: (values.mobiles || []).filter((row) => row?.value),
+        documentItems: (values.documentItems || []).filter((row) => row?.name),
+        extraFields: (values.extraFields || []).filter((row) => row?.label),
         joiningDate: values.joiningDate ? values.joiningDate.format("YYYY-MM-DD") : "",
         serialNo: values.serialNo,
         balances: {
@@ -126,12 +184,16 @@ export default function AdminEmployeeCreate() {
 
       const { data } = await api.post("/admin/employees", payload);
       message.success(`Employee ${data.employee.empId} created`);
-      navigate(`/admin/employees/${data.employee.empId}`);
+      navigate(`${base}/employees/${data.employee.empId}`);
     } catch (err) {
       message.error(err.response?.data?.message || "Could not create employee");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (user && !user.isHr) {
+    return <Navigate to="/admin/employees" replace />;
   }
 
   if (loading) {
@@ -153,7 +215,7 @@ export default function AdminEmployeeCreate() {
       title={<><UserAddOutlined /> Add New Employee</>}
       subtitle="Create Softnox employee with full profile, leave balances & assets"
       extra={
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/admin/employees")}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`${base}/employees`)}>
           Back
         </Button>
       }
@@ -165,7 +227,24 @@ export default function AdminEmployeeCreate() {
         onFinish={onFinish}
         requiredMark="optional"
       >
-        <Card className="soft-card emp-create-card" title="Basic information">
+        <div className={`emp-progress${progress === 100 ? " is-done" : ""}`}>
+          <div className="emp-progress-card">
+          <div className="emp-progress-meta">
+            <span className="emp-progress-label">
+              <span className="emp-sec-ico tone-blue"><IdcardOutlined /></span>
+              Profile progress
+            </span>
+            <b>{progress}% filled</b>
+          </div>
+          <div className="emp-progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+            <div className="emp-progress-bar" style={{ width: `${progress}%` }} />
+          </div>
+          {progress === 100 ? (
+            <p className="emp-progress-done">Achha, saari info fill ho gayi. Ab employee create kar sakte ho.</p>
+          ) : null}
+          </div>
+        </div>
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="blue" icon={<IdcardOutlined />} title="Basic information" hint="Code, role, and team" />}>
           <Row gutter={[16, 0]}>
             <Col xs={24} md={8}>
               <Form.Item name="empId" label="Employee Code" rules={[{ required: true, message: "Emp code required" }]}>
@@ -230,22 +309,49 @@ export default function AdminEmployeeCreate() {
           </Row>
         </Card>
 
-        <Card className="soft-card emp-create-card" title="Contact">
-          <Row gutter={[16, 0]}>
-            <Col xs={24} md={12}>
-              <Form.Item name="email" label="Email" rules={[{ type: "email", message: "Valid email" }]}>
-                <Input placeholder="name@softnox.com" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="mobile" label="Mobile">
-                <Input placeholder="03XXXXXXXXX" />
-              </Form.Item>
-            </Col>
-          </Row>
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="cyan" icon={<MailOutlined />} title="Contact" hint="Add as many emails and numbers as you need" />}>
+          <Form.List name="emails">
+            {(fields, { add, remove }) => (
+              <div className="emp-dyn-block">
+                {fields.map((field) => (
+                  <div key={field.key} className="emp-dyn-row">
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "value"]}
+                      label="Email"
+                      rules={[{ type: "email", message: "Valid email" }]}
+                    >
+                      <Input placeholder="name@softnox.com" />
+                    </Form.Item>
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove email" onClick={() => remove(field.name)} />
+                  </div>
+                ))}
+                <Button className="emp-add-btn" icon={<PlusOutlined />} onClick={() => add({ value: "" })}>
+                  Add email
+                </Button>
+              </div>
+            )}
+          </Form.List>
+          <Form.List name="mobiles">
+            {(fields, { add, remove }) => (
+              <div className="emp-dyn-block">
+                {fields.map((field) => (
+                  <div key={field.key} className="emp-dyn-row">
+                    <Form.Item {...field} name={[field.name, "value"]} label="Mobile">
+                      <Input placeholder="03XXXXXXXXX" />
+                    </Form.Item>
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove mobile" onClick={() => remove(field.name)} />
+                  </div>
+                ))}
+                <Button className="emp-add-btn" icon={<PlusOutlined />} onClick={() => add({ value: "" })}>
+                  Add mobile
+                </Button>
+              </div>
+            )}
+          </Form.List>
         </Card>
 
-        <Card className="soft-card emp-create-card" title="Personal information">
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="purple" icon={<UserOutlined />} title="Personal information" hint="Private details for the file" />}>
           <Row gutter={[16, 0]}>
             <Col xs={24} md={8}>
               <Form.Item name="gender" label="Gender">
@@ -289,7 +395,53 @@ export default function AdminEmployeeCreate() {
           </Row>
         </Card>
 
-        <Card className="soft-card emp-create-card" title="Leave balances">
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="amber" icon={<FileTextOutlined />} title="Documents received" hint="Tick only what HR has in hand" />}>
+          <Form.List name="documentItems">
+            {(fields, { add, remove }) => (
+              <div className="emp-dyn-block">
+                {fields.map((field) => (
+                  <div key={field.key} className="emp-dyn-row emp-dyn-doc">
+                    <Form.Item {...field} name={[field.name, "name"]} label="Document">
+                      <Input placeholder="Document name" />
+                    </Form.Item>
+                    <Form.Item {...field} name={[field.name, "received"]} valuePropName="checked" label=" ">
+                      <Checkbox>Received</Checkbox>
+                    </Form.Item>
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove document" onClick={() => remove(field.name)} />
+                  </div>
+                ))}
+                <Button className="emp-add-btn" icon={<PlusOutlined />} onClick={() => add({ name: "", received: false })}>
+                  Add document
+                </Button>
+              </div>
+            )}
+          </Form.List>
+        </Card>
+
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="rose" icon={<PlusOutlined />} title="Extra information" hint="Any other detail, saved with the employee" />}>
+          <Form.List name="extraFields">
+            {(fields, { add, remove }) => (
+              <div className="emp-dyn-block">
+                {fields.map((field) => (
+                  <div key={field.key} className="emp-dyn-row">
+                    <Form.Item {...field} name={[field.name, "label"]} label="Field name">
+                      <Input placeholder="e.g. Emergency contact" />
+                    </Form.Item>
+                    <Form.Item {...field} name={[field.name, "value"]} label="Value">
+                      <Input placeholder="Value" />
+                    </Form.Item>
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove field" onClick={() => remove(field.name)} />
+                  </div>
+                ))}
+                <Button className="emp-add-btn" icon={<PlusOutlined />} onClick={() => add({ label: "", value: "" })}>
+                  Add field
+                </Button>
+              </div>
+            )}
+          </Form.List>
+        </Card>
+
+        <Card className="soft-card emp-create-card" title={<SectionTitle tone="green" icon={<CalendarOutlined />} title="Leave balances" hint="Opening balance for this year" />}>
           <Row gutter={[16, 0]}>
             <Col xs={24} md={8}>
               <Form.Item name="casual" label="Casual Leave">
@@ -311,8 +463,7 @@ export default function AdminEmployeeCreate() {
 
         <Card
           className="soft-card emp-create-card"
-          title="Assets assigned"
-          extra={<span className="muted">Add laptop, ID card, phone, etc.</span>}
+          title={<SectionTitle tone="blue" icon={<LaptopOutlined />} title="Assets assigned" hint="Laptop, ID card, phone" />}
         >
           <Form.List name="assets">
             {(fields, { add, remove }) => (
@@ -362,7 +513,7 @@ export default function AdminEmployeeCreate() {
                     <Divider style={{ margin: "8px 0 16px" }} />
                   </div>
                 ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ type: "other", categoryCode: "AST-001", assignedBy: "Softnox IT" })}>
+                <Button className="emp-add-btn" icon={<PlusOutlined />} onClick={() => add({ type: "other", categoryCode: "AST-001", assignedBy: "Softnox IT" })}>
                   Add asset
                 </Button>
               </>
@@ -372,7 +523,7 @@ export default function AdminEmployeeCreate() {
 
         <div className="emp-create-actions">
           <Space>
-            <Button onClick={() => navigate("/admin/employees")}>Cancel</Button>
+            <Button onClick={() => navigate(`${base}/employees`)}>Cancel</Button>
             <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} className="emp-create-save">
               Create Employee
             </Button>

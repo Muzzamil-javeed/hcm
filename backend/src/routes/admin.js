@@ -3,17 +3,17 @@ import { Employee } from "../models/Employee.js";
 import { AttendanceLog } from "../models/AttendanceLog.js";
 import { LeaveRequest } from "../models/LeaveRequest.js";
 import { LeaveBalance } from "../models/LeaveBalance.js";
-import { Announcement } from "../models/Announcement.js";
+import { Announcement, purgeExpiredAnnouncements, readAnnouncementPdf, readAnnouncementWindow } from "../models/Announcement.js";
 import { Asset } from "../models/Asset.js";
 import { Device } from "../models/Device.js";
-import { authRequired, adminRequired } from "../middleware/auth.js";
+import { authRequired, staffRequired } from "../middleware/auth.js";
 import { addDays, buildDailyRecords, buildWeekChart, classifyDay, currentWorkDate, FLAG_COLORS, formatDisplayDate, isWeekend, monthRange, punchesForWorkDate, todayStr } from "../utils/attendance.js";
 import { buildEmployeeProjects, ensureEmployeeAssets } from "../utils/assets.js";
 import { importEmployeesFromExcel, defaultRosterPath } from "../scripts/importEmployees.js";
 import { getLastSync, refreshMachineCache } from "../services/zkMachines.js";
 
 const router = Router();
-router.use(authRequired, adminRequired);
+router.use(authRequired, staffRequired);
 
 const ROLE_GROSS = { Head: 180000, Manager: 120000, Member: 70000 };
 const ROLE_SCORE = { Head: 90, Manager: 80, Member: 70 };
@@ -105,6 +105,9 @@ router.get("/employees/meta", async (_req, res) => {
 });
 
 router.post("/employees", async (req, res) => {
+  if (req.user?.role !== "hr") {
+    return res.status(403).json({ message: "Only HR can add employees. Admin can view only." });
+  }
   const body = req.body || {};
   const empId = String(body.empId || "").trim();
   const name = String(body.name || "").trim();
@@ -116,6 +119,20 @@ router.post("/employees", async (req, res) => {
   if (exists) return res.status(409).json({ message: `Employee ${empId} already exists` });
 
   const serialNo = Number(body.serialNo) || ((await Employee.countDocuments()) + 1);
+  const emails = (Array.isArray(body.emails) ? body.emails : [])
+    .map((row) => ({ value: String(row?.value || "").trim().toLowerCase() }))
+    .filter((row) => row.value);
+  const mobiles = (Array.isArray(body.mobiles) ? body.mobiles : [])
+    .map((row) => ({ value: String(row?.value || "").trim() }))
+    .filter((row) => row.value);
+  const documentItems = (Array.isArray(body.documentItems) ? body.documentItems : [])
+    .map((row) => ({ name: String(row?.name || "").trim(), received: Boolean(row?.received) }))
+    .filter((row) => row.name);
+  const extraFields = (Array.isArray(body.extraFields) ? body.extraFields : [])
+    .map((row) => ({ label: String(row?.label || "").trim(), value: String(row?.value || "").trim() }))
+    .filter((row) => row.label);
+  const primaryEmail = emails[0]?.value || String(body.email || "").trim().toLowerCase() || undefined;
+  const primaryMobile = mobiles[0]?.value || String(body.mobile || "").trim();
   const employee = await Employee.create({
     empId,
     name,
@@ -132,11 +149,20 @@ router.post("/employees", async (req, res) => {
     dateOfBirth: String(body.dateOfBirth || "").trim(),
     cnicNo: String(body.cnicNo || "").trim(),
     religion: String(body.religion || "").trim(),
-    email: String(body.email || "").trim().toLowerCase() || undefined,
-    mobile: String(body.mobile || "").trim(),
+    email: primaryEmail,
+    mobile: primaryMobile,
+    emails,
+    mobiles,
+    documentItems,
+    extraFields,
     joiningDate: String(body.joiningDate || todayStr()).trim(),
     serialNo,
     source: "roster",
+    documents: {
+      cnic: documentItems.some((d) => d.name.toLowerCase() === "cnic" && d.received),
+      utilityBill: documentItems.some((d) => /utility/i.test(d.name) && d.received),
+      ndaSigned: documentItems.some((d) => /nda/i.test(d.name) && d.received),
+    },
   });
 
   const bal = body.balances || {};
@@ -182,11 +208,7 @@ router.post("/employees", async (req, res) => {
     }
   }
 
-  // If no assets were passed, seed Softnox default kit
-  let assets = createdAssets;
-  if (!assets.length) {
-    assets = await ensureEmployeeAssets(employee.toObject());
-  }
+  const assets = createdAssets;
 
   res.status(201).json({
     message: "Employee created",
@@ -779,7 +801,7 @@ router.get("/attendance/logs", async (req, res) => {
 router.get("/leaves", async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
-  const requests = await LeaveRequest.find(filter).sort({ createdAt: -1 }).limit(500);
+  const requests = await LeaveRequest.find(filter).select("-attachmentData").sort({ createdAt: -1 }).limit(500);
   const empIds = [...new Set(requests.map((r) => r.empId))];
   const [employees, balances, countsAgg] = await Promise.all([
     Employee.find({ empId: { $in: empIds } }),
@@ -788,7 +810,7 @@ router.get("/leaves", async (req, res) => {
   ]);
   const empMap = new Map(employees.map((e) => [e.empId, e]));
   const balMap = new Map(balances.map((b) => [b.empId, b]));
-  const counts = { pending: 0, approved: 0, rejected: 0, total: 0 };
+  const counts = { pending: 0, hr_approved: 0, approved: 0, rejected: 0, total: 0 };
   for (const c of countsAgg) {
     counts[c._id] = c.count;
     counts.total += c.count;
@@ -1130,30 +1152,8 @@ router.get("/audit", async (_req, res) => {
 });
 
 router.get("/announcements", async (_req, res) => {
-  let count = await Announcement.countDocuments();
-  if (count === 0) {
-    await Announcement.insertMany([
-      {
-        title: "Welcome to Softnox FlowHCM",
-        body: "Use the admin console to manage roster, attendance, and leave for Softnox Technologies.",
-        audience: "all",
-        createdBy: "system",
-      },
-      {
-        title: "Workday cutoff reminder",
-        body: "Attendance is evaluated against the 08:00 Asia/Karachi workday cutoff. Please punch in on time.",
-        audience: "employees",
-        createdBy: "system",
-      },
-      {
-        title: "Leave approvals",
-        body: "Managers and admins: review pending leave requests regularly so balances stay accurate.",
-        audience: "admin",
-        createdBy: "system",
-      },
-    ]);
-  }
-  const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(100).lean();
+  await purgeExpiredAnnouncements();
+  const announcements = await Announcement.find().select("-documentData").sort({ createdAt: -1 }).limit(100).lean();
   res.json({ announcements });
 });
 
@@ -1164,13 +1164,52 @@ router.post("/announcements", async (req, res) => {
   if (!title || !body) {
     return res.status(400).json({ message: "Title and body are required" });
   }
+  const dateWindow = readAnnouncementWindow(req.body);
+  if (dateWindow.error) return res.status(400).json({ message: dateWindow.error });
+  const pdf = readAnnouncementPdf(req.body);
+  if (pdf.error) return res.status(400).json({ message: pdf.error });
   const doc = await Announcement.create({
     title,
     body,
     audience,
+    startDate: dateWindow.startDate,
+    endDate: dateWindow.endDate,
+    documentName: pdf.documentName,
+    documentData: pdf.documentData,
     createdBy: req.user?.name || req.user?.email || "admin",
   });
   res.status(201).json({ announcement: doc });
+});
+
+router.patch("/announcements/:id", async (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  const body = String(req.body?.body || "").trim();
+  if (!title || !body) {
+    return res.status(400).json({ message: "Title and body are required" });
+  }
+  const update = { title, body };
+  if (["all", "employees", "admin"].includes(req.body?.audience)) update.audience = req.body.audience;
+  if (req.body?.startDate || req.body?.endDate) {
+    const dateWindow = readAnnouncementWindow(req.body);
+    if (dateWindow.error) return res.status(400).json({ message: dateWindow.error });
+    update.startDate = dateWindow.startDate;
+    update.endDate = dateWindow.endDate;
+  }
+  if ("documentData" in (req.body || {})) {
+    const pdf = readAnnouncementPdf(req.body);
+    if (pdf.error) return res.status(400).json({ message: pdf.error });
+    update.documentName = pdf.documentName;
+    update.documentData = pdf.documentData;
+  }
+  const doc = await Announcement.findByIdAndUpdate(req.params.id, update, { new: true });
+  if (!doc) return res.status(404).json({ message: "Announcement not found" });
+  res.json({ announcement: doc });
+});
+
+router.delete("/announcements/:id", async (req, res) => {
+  const doc = await Announcement.findByIdAndDelete(req.params.id);
+  if (!doc) return res.status(404).json({ message: "Announcement not found" });
+  res.json({ ok: true });
 });
 
 router.get("/settings", async (_req, res) => {

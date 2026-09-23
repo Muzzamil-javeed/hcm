@@ -10,6 +10,22 @@ function scopedEmpId(req) {
   return req.user.empId;
 }
 
+const DOC_PREFIXES = ["data:image/jpeg", "data:image/png", "data:image/webp", "data:application/pdf"];
+
+function readAttachment(body) {
+  const name = String(body?.attachmentName || "").trim().slice(0, 180);
+  const data = String(body?.attachmentData || "");
+  if (!name && !data) return { attachmentName: "", attachmentMime: "", attachmentData: "" };
+  if (!name || !data.startsWith("data:") || data.length > 2_200_000) {
+    return { error: "Document must be a JPG, PNG, WEBP, or PDF under 1.5 MB" };
+  }
+  if (!DOC_PREFIXES.some((prefix) => data.startsWith(prefix))) {
+    return { error: "Document must be a JPG, PNG, WEBP, or PDF" };
+  }
+  const mime = data.slice(5, data.indexOf(";")) || "";
+  return { attachmentName: name, attachmentMime: mime, attachmentData: data };
+}
+
 function countDays(fromDate, toDate, duration = "full") {
   const start = new Date(`${fromDate}T12:00:00`);
   const end = new Date(`${toDate}T12:00:00`);
@@ -38,7 +54,7 @@ router.get("/balances", authRequired, async (req, res) => {
 
 router.get("/", authRequired, async (req, res) => {
   const empId = scopedEmpId(req);
-  const requests = await LeaveRequest.find({ empId }).sort({ createdAt: -1 });
+  const requests = await LeaveRequest.find({ empId }).select("-attachmentData").sort({ createdAt: -1 });
   res.json({ requests });
 });
 
@@ -55,6 +71,8 @@ router.post("/", authRequired, async (req, res) => {
   }
   const leaveDuration = duration === "half" ? "half" : "full";
   const days = countDays(fromDate, toDate, leaveDuration);
+  const attachment = readAttachment(req.body);
+  if (attachment.error) return res.status(400).json({ message: attachment.error });
 
   if (type !== "unpaid") {
     const balance = await LeaveBalance.findOneAndUpdate(
@@ -77,14 +95,31 @@ router.post("/", authRequired, async (req, res) => {
     days,
     duration: leaveDuration,
     reason: reason || "",
+    attachmentName: attachment.attachmentName,
+    attachmentMime: attachment.attachmentMime,
+    attachmentData: attachment.attachmentData,
     status: "pending",
   });
   res.status(201).json({ request });
 });
 
+router.get("/:id", authRequired, async (req, res) => {
+  if (req.user.role !== "hr" && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Only HR or Admin can open leave details" });
+  }
+  const request = await LeaveRequest.findById(req.params.id).select("attachmentName attachmentMime attachmentData");
+  if (!request) return res.status(404).json({ message: "Request not found" });
+  res.json({
+    attachmentName: request.attachmentName || "",
+    attachmentMime: request.attachmentMime || "",
+    attachmentData: request.attachmentData || "",
+  });
+});
+
 router.patch("/:id", authRequired, async (req, res) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Only admin can approve leaves" });
+  const role = req.user.role;
+  if (role !== "hr" && role !== "admin") {
+    return res.status(403).json({ message: "Only HR or Admin can review leaves" });
   }
   const { status } = req.body || {};
   if (!["approved", "rejected"].includes(status)) {
@@ -92,12 +127,36 @@ router.patch("/:id", authRequired, async (req, res) => {
   }
   const request = await LeaveRequest.findById(req.params.id);
   if (!request) return res.status(404).json({ message: "Request not found" });
-  if (request.status !== "pending") {
-    return res.status(400).json({ message: "Request already processed" });
+
+  if (status === "rejected") {
+    const hrCanReject = role === "hr" && request.status === "pending";
+    const adminCanReject = role === "admin" && request.status === "hr_approved";
+    if (!hrCanReject && !adminCanReject) {
+      return res.status(400).json({ message: "This request is not waiting for you" });
+    }
+    request.status = "rejected";
+    await request.save();
+    return res.json({ request });
   }
-  request.status = status;
+
+  if (role === "hr") {
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "HR can only approve a new request" });
+    }
+    request.status = "hr_approved";
+    request.hrApprovedBy = req.user.name || "HR";
+    request.hrApprovedAt = new Date();
+    await request.save();
+    return res.json({ request });
+  }
+
+  if (request.status !== "hr_approved") {
+    return res.status(400).json({ message: "Admin approves only after HR has approved" });
+  }
+  request.status = "approved";
+  request.adminApprovedBy = req.user.name || "Admin";
   await request.save();
-  if (status === "approved" && request.type !== "unpaid") {
+  if (request.type !== "unpaid") {
     await LeaveBalance.findOneAndUpdate(
       { empId: request.empId },
       { $inc: { [request.type]: -request.days } }

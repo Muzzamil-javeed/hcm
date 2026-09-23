@@ -13,4 +13,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+export async function openAnnouncementPdf(id) {
+  const { data } = await api.get(`/dashboard/announcements/${id}/document`);
+  const file = await fetch(data.data);
+  const blob = await file.blob();
+  const url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+  window.open(url, "_blank", "noopener");
+}
+
 export default api;

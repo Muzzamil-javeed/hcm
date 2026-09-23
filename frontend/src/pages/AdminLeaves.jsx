@@ -22,11 +22,21 @@ import {
 } from "@ant-design/icons";
 import api from "../api";
 import AdminPage from "../components/AdminPage";
+import LeaveDetailModal from "../components/LeaveDetailModal";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS_COLOR = {
   pending: "gold",
+  hr_approved: "blue",
   approved: "success",
   rejected: "error",
+};
+
+const STATUS_LABEL = {
+  pending: "With HR",
+  hr_approved: "With Admin",
+  approved: "Approved",
+  rejected: "Rejected",
 };
 
 const TYPE_COLOR = {
@@ -53,14 +63,14 @@ function hashColor(id) {
 }
 
 function titleCase(v = "") {
-  return v ? v[0].toUpperCase() + v.slice(1) : "—";
+  return STATUS_LABEL[v] || (v ? v[0].toUpperCase() + v.slice(1) : "—");
 }
 
-function LeaveCard({ row, acting, onDecide, onOpen }) {
+function LeaveCard({ row, acting, onDecide, onDetail, canDecide, approveLabel }) {
   return (
-    <article className="leave-card ad-enter">
+    <article className="leave-card ad-enter" onClick={() => onDetail(row)}>
       <div className="leave-card-top">
-        <button type="button" className="leave-card-emp" onClick={() => onOpen(row)}>
+        <div className="leave-card-emp">
           <Avatar size={48} style={{ background: hashColor(row.empId) }}>
             {initials(row.employeeName)}
           </Avatar>
@@ -68,7 +78,7 @@ function LeaveCard({ row, acting, onDecide, onOpen }) {
             <b>{row.employeeName}</b>
             <small>Emp {row.empId} · {row.jobTitle || "Employee"}</small>
           </div>
-        </button>
+        </div>
         <Tag color={STATUS_COLOR[row.status] || "default"}>{titleCase(row.status)}</Tag>
       </div>
 
@@ -103,29 +113,33 @@ function LeaveCard({ row, acting, onDecide, onOpen }) {
         </div>
       ) : null}
 
-      {row.status === "pending" ? (
+      {canDecide ? (
         <div className="leave-card-actions">
           <button
             type="button"
             className="emp-btn primary"
             disabled={acting === row._id}
-            onClick={() => onDecide(row._id, "approved")}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDecide(row._id, "approved");
+            }}
           >
-            <CheckCircleOutlined /> Approve
+            <CheckCircleOutlined /> {approveLabel}
           </button>
           <button
             type="button"
             className="emp-btn ghost danger"
             disabled={acting === row._id}
-            onClick={() => onDecide(row._id, "rejected")}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDecide(row._id, "rejected");
+            }}
           >
             <CloseCircleOutlined /> Reject
           </button>
         </div>
       ) : (
-        <button type="button" className="emp-btn ghost block" onClick={() => onOpen(row)}>
-          View employee profile →
-        </button>
+        <span className="muted leave-card-hint">Click to open details</span>
       )}
     </article>
   );
@@ -133,8 +147,12 @@ function LeaveCard({ row, acting, onDecide, onOpen }) {
 
 export default function AdminLeaves() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { message } = AntApp.useApp();
-  const [status, setStatus] = useState("pending");
+  const isHr = Boolean(user?.isHr);
+  const base = isHr ? "/hr" : "/admin";
+  const queueStatus = isHr ? "pending" : "hr_approved";
+  const [status, setStatus] = useState(queueStatus);
   const [rows, setRows] = useState([]);
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
   const [loading, setLoading] = useState(false);
@@ -142,6 +160,7 @@ export default function AdminLeaves() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [view, setView] = useState("cards");
+  const [detail, setDetail] = useState(null);
 
   async function load(nextStatus = status) {
     setLoading(true);
@@ -166,7 +185,14 @@ export default function AdminLeaves() {
     setActing(id);
     try {
       await api.patch(`/leaves/${id}`, { status: next });
-      message.success(next === "approved" ? "Leave approved" : "Leave rejected");
+      message.success(
+        next === "rejected"
+          ? "Leave rejected"
+          : isHr
+            ? "Sent to Admin for final approval"
+            : "Leave approved"
+      );
+      if (detail?._id === id) setDetail(null);
       await load();
     } catch (err) {
       message.error(err.response?.data?.message || "Update failed");
@@ -200,7 +226,7 @@ export default function AdminLeaves() {
       dataIndex: "employeeName",
       width: 240,
       render: (name, row) => (
-        <button type="button" className="emp-cell linkish" onClick={() => navigate(`/admin/employees/${row.empId}`)}>
+        <button type="button" className="emp-cell linkish" onClick={(e) => { e.stopPropagation(); setDetail(row); }}>
           <Avatar size={40} style={{ background: hashColor(row.empId) }}>{initials(name)}</Avatar>
           <div>
             <b>{name}</b>
@@ -230,12 +256,12 @@ export default function AdminLeaves() {
       title: "Action",
       width: 200,
       render: (_, row) =>
-        row.status === "pending" ? (
+        (isHr ? row.status === "pending" : row.status === "hr_approved") ? (
           <div className="leave-table-actions">
-            <button type="button" className="emp-btn primary sm" disabled={acting === row._id} onClick={() => decide(row._id, "approved")}>
-              Approve
+            <button type="button" className="emp-btn primary sm" disabled={acting === row._id} onClick={(e) => { e.stopPropagation(); decide(row._id, "approved"); }}>
+              {isHr ? "HR approve" : "Final approve"}
             </button>
-            <button type="button" className="emp-btn ghost danger sm" disabled={acting === row._id} onClick={() => decide(row._id, "rejected")}>
+            <button type="button" className="emp-btn ghost danger sm" disabled={acting === row._id} onClick={(e) => { e.stopPropagation(); decide(row._id, "rejected"); }}>
               Reject
             </button>
           </div>
@@ -248,7 +274,7 @@ export default function AdminLeaves() {
   return (
     <AdminPage
       title={<><CalendarOutlined /> Leave Approvals</>}
-      subtitle="Review and decide Softnox leave requests · cards or list"
+      subtitle={isHr ? "HR approves first. Then the request goes to Admin." : "Final approval. You only decide requests HR has already approved."}
       extra={
         <Segmented
           value={view}
@@ -270,9 +296,9 @@ export default function AdminLeaves() {
         >
           <div className="shift-kpi-icon"><ClockCircleOutlined /></div>
           <div>
-            <span>Pending</span>
+            <span>With HR</span>
             <strong>{counts.pending || 0}</strong>
-            <small>awaiting decision</small>
+            <small>first approval</small>
           </div>
         </article>
         <article
@@ -330,7 +356,8 @@ export default function AdminLeaves() {
           onChange={setStatus}
           className="emp-filter-select"
           options={[
-            { value: "pending", label: "Pending" },
+            { value: "pending", label: "With HR" },
+            { value: "hr_approved", label: "With Admin" },
             { value: "approved", label: "Approved" },
             { value: "rejected", label: "Rejected" },
             { value: "all", label: "All statuses" },
@@ -357,7 +384,9 @@ export default function AdminLeaves() {
               row={row}
               acting={acting}
               onDecide={decide}
-              onOpen={(r) => navigate(`/admin/employees/${r.empId}`)}
+              canDecide={isHr ? row.status === "pending" : row.status === "hr_approved"}
+              approveLabel={isHr ? "HR approve" : "Final approve"}
+              onDetail={setDetail}
             />
           ))}
           {!filtered.length && (
@@ -377,7 +406,7 @@ export default function AdminLeaves() {
             </div>
           </div>
           <Table
-            className="emp-table"
+            className="emp-table leave-table"
             rowKey="_id"
             loading={loading}
             dataSource={filtered}
@@ -385,9 +414,19 @@ export default function AdminLeaves() {
             pagination={{ pageSize: 12, showTotal: (t) => `${t} requests` }}
             scroll={{ x: 1100 }}
             locale={{ emptyText: "No leave requests" }}
+            onRow={(row) => ({ onClick: () => setDetail(row) })}
           />
         </section>
       )}
+      <LeaveDetailModal
+        row={detail}
+        onClose={() => setDetail(null)}
+        canDecide={detail ? (isHr ? detail.status === "pending" : detail.status === "hr_approved") : false}
+        approveLabel={isHr ? "HR approve" : "Final approve"}
+        acting={acting}
+        onDecide={decide}
+        onOpenProfile={(empId) => navigate(`${base}/employees/${empId}`)}
+      />
     </AdminPage>
   );
 }

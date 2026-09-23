@@ -3,23 +3,28 @@ import {
   App as AntApp,
   Avatar,
   Button,
+  DatePicker,
   Empty,
   Form,
   Input,
   Select,
   Spin,
   Tag,
+  Upload,
 } from "antd";
 import {
   BellOutlined,
+  DeleteOutlined,
+  EditOutlined,
   NotificationOutlined,
+  PaperClipOutlined,
   PlusOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import api from "../api";
+import api, { openAnnouncementPdf } from "../api";
 import AdminPage from "../components/AdminPage";
 
 dayjs.extend(relativeTime);
@@ -41,11 +46,14 @@ function authorInitials(name = "S") {
 }
 
 export default function AdminAnnouncements() {
-  const { message } = AntApp.useApp();
+  const { message, modal } = AntApp.useApp();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [editingId, setEditingId] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfName, setPdfName] = useState("");
   const [form] = Form.useForm();
 
   async function load() {
@@ -67,16 +75,53 @@ export default function AdminAnnouncements() {
   async function onCreate(values) {
     setSaving(true);
     try {
-      await api.post("/admin/announcements", values);
-      message.success("Announcement published");
+      const payload = {
+        ...values,
+        startDate: values.startDate?.format?.("YYYY-MM-DD") || "",
+        endDate: values.endDate?.format?.("YYYY-MM-DD") || "",
+      };
+      if (pdfFile) {
+        payload.documentName = pdfFile.name;
+        payload.documentData = pdfFile.data;
+      }
+      if (editingId) {
+        await api.patch(`/admin/announcements/${editingId}`, payload);
+        message.success("Announcement updated");
+      } else {
+        await api.post("/admin/announcements", payload);
+        message.success("Announcement published");
+      }
+      setEditingId(null);
+      setPdfFile(null);
+      setPdfName("");
       form.resetFields();
       form.setFieldsValue({ audience: "all" });
       await load();
     } catch (err) {
-      message.error(err.response?.data?.message || "Could not create announcement");
+      message.error(err.response?.data?.message || "Could not save announcement");
     } finally {
       setSaving(false);
     }
+  }
+
+  function onDelete(row) {
+    modal.confirm({
+      title: "Delete this announcement?",
+      content: "This post will be removed from HR, employees, and the notification bell.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: async () => {
+        await api.delete(`/admin/announcements/${row._id}`);
+        if (editingId === row._id) {
+          setEditingId(null);
+          form.resetFields();
+          form.setFieldsValue({ audience: "all" });
+        }
+        message.success("Announcement deleted");
+        await load();
+      },
+    });
   }
 
   const filtered = useMemo(() => {
@@ -105,8 +150,8 @@ export default function AdminAnnouncements() {
               <PlusOutlined />
             </div>
             <div>
-              <h3>Create announcement</h3>
-              <p>Publish a note to Softnox employees or admins.</p>
+              <h3>{editingId ? "Edit announcement" : "Create announcement"}</h3>
+              <p>{editingId ? "Update this post. Employees see the new text." : "Publish a note to Softnox employees or admins."}</p>
             </div>
           </header>
 
@@ -123,6 +168,43 @@ export default function AdminAnnouncements() {
             <Form.Item name="body" label="Message" rules={[{ required: true, message: "Message required" }]}>
               <Input.TextArea rows={5} placeholder="Write the announcement…" maxLength={2000} showCount />
             </Form.Item>
+            <div className="hr-ann-dates">
+              <Form.Item name="startDate" label="Show from" rules={[{ required: true, message: "Start date required" }]}>
+                <DatePicker style={{ width: "100%" }} format="DD MMM YYYY" />
+              </Form.Item>
+              <Form.Item name="endDate" label="Show until" rules={[{ required: true, message: "End date required" }]}>
+                <DatePicker style={{ width: "100%" }} format="DD MMM YYYY" />
+              </Form.Item>
+            </div>
+            <div className="hr-ann-pdf">
+              <span>Policy PDF</span>
+              <Upload
+                accept="application/pdf,.pdf"
+                maxCount={1}
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                  if (!isPdf) {
+                    message.error("Only PDF allowed");
+                    return false;
+                  }
+                  if (file.size > 4 * 1024 * 1024) {
+                    message.error("PDF must be under 4 MB");
+                    return false;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setPdfFile({ name: file.name, data: String(reader.result || "") });
+                    setPdfName(file.name);
+                  };
+                  reader.readAsDataURL(file);
+                  return false;
+                }}
+              >
+                <Button icon={<PaperClipOutlined />}>Upload PDF</Button>
+              </Upload>
+              <em>{pdfName || "Only PDF. Everyone with this post can open it."}</em>
+            </div>
             <Form.Item name="audience" label="Audience">
               <Select
                 options={[
@@ -140,8 +222,23 @@ export default function AdminAnnouncements() {
               className="ann-publish"
               block
             >
-              Publish announcement
+              {editingId ? "Save changes" : "Publish announcement"}
             </Button>
+            {editingId ? (
+              <Button
+                block
+                style={{ marginTop: 8 }}
+                onClick={() => {
+                  setEditingId(null);
+                  setPdfFile(null);
+                  setPdfName("");
+                  form.resetFields();
+                  form.setFieldsValue({ audience: "all" });
+                }}
+              >
+                Cancel edit
+              </Button>
+            ) : null}
           </Form>
         </aside>
 
@@ -206,8 +303,39 @@ export default function AdminAnnouncements() {
                       </div>
                       <h4>{a.title}</h4>
                       <p>{a.body}</p>
+                      {a.documentName ? (
+                        <button type="button" className="hr-ann-pdf-link" onClick={() => openAnnouncementPdf(a._id)}>
+                          <PaperClipOutlined /> {a.documentName}
+                        </button>
+                      ) : null}
                       <div className="ann-card-foot">
-                        <span>{a.createdAt ? dayjs(a.createdAt).format("DD MMM YYYY · HH:mm") : ""}</span>
+                        <span>
+                          {a.startDate && a.endDate
+                            ? `${dayjs(a.startDate).format("DD MMM YYYY")} → ${dayjs(a.endDate).format("DD MMM YYYY")}`
+                            : a.createdAt ? dayjs(a.createdAt).format("DD MMM YYYY · HH:mm") : ""}
+                        </span>
+                        <span className="ann-card-actions">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(a._id);
+                              form.setFieldsValue({
+                                title: a.title,
+                                body: a.body,
+                                audience: a.audience || "all",
+                                startDate: a.startDate ? dayjs(a.startDate) : null,
+                                endDate: a.endDate ? dayjs(a.endDate) : null,
+                              });
+                              setPdfFile(null);
+                              setPdfName(a.documentName || "");
+                            }}
+                          >
+                            <EditOutlined /> Edit
+                          </button>
+                          <button type="button" className="danger" onClick={() => onDelete(a)}>
+                            <DeleteOutlined /> Delete
+                          </button>
+                        </span>
                       </div>
                     </div>
                   </li>

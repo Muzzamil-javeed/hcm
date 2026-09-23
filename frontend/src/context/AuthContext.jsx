@@ -42,6 +42,12 @@ export function AuthProvider({ children }) {
     setUser(data.user);
   }, []);
 
+  const hrLogin = useCallback(async (username, password) => {
+    const { data } = await api.post("/auth/hr", { username, password });
+    localStorage.setItem("flowhcm_token", data.token);
+    setUser(data.user);
+  }, []);
+
   const logout = useCallback(async () => {
     await api.post("/auth/logout");
     localStorage.removeItem("flowhcm_token");
@@ -49,7 +55,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, googleEnabled, demoLogin, adminLogin, logout, reload: loadMe }}>
+    <AuthContext.Provider value={{ user, loading, googleEnabled, demoLogin, adminLogin, hrLogin, logout, reload: loadMe }}>
       {children}
     </AuthContext.Provider>
   );

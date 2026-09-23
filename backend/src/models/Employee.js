@@ -19,10 +19,19 @@ const employeeSchema = new mongoose.Schema(
     religion: { type: String, default: "" },
     email: String,
     mobile: { type: String, default: "" },
+    emails: [{ value: { type: String } }],
+    mobiles: [{ value: { type: String } }],
+    documentItems: [{ name: { type: String }, received: { type: Boolean, default: false } }],
+    extraFields: [{ label: { type: String }, value: { type: String } }],
     joiningDate: { type: String, default: "" },
     serialNo: { type: Number },
     source: { type: String, default: "roster" },
     avatar: String,
+    documents: {
+      cnic: { type: Boolean, default: false },
+      utilityBill: { type: Boolean, default: false },
+      ndaSigned: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );

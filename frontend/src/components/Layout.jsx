@@ -25,7 +25,7 @@ import {
   UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import api from "../api";
+import api, { openAnnouncementPdf } from "../api";
 import { useAuth } from "../context/AuthContext";
 
 const { Header, Sider, Content, Footer } = AntLayout;
@@ -67,6 +67,12 @@ const PAGE_TITLES = {
   "/admin/roles": "Roles & Permissions",
   "/admin/audit": "Audit Logs",
   "/admin/devices": "Devices",
+  "/hr/dashboard": "HR Dashboard",
+  "/hr/employees": "Employees",
+  "/hr/leaves": "Leave Approvals",
+  "/hr/documents": "Documents",
+  "/hr/attendance": "Attendance",
+  "/hr/announcements": "Announcements",
 };
 
 export default function Layout() {
@@ -74,6 +80,8 @@ export default function Layout() {
   const loc = useLocation();
   const navigate = useNavigate();
   const isAdmin = Boolean(user?.isSuperAdmin);
+  const isHr = Boolean(user?.isHr);
+  const isStaff = isAdmin || isHr;
   const [notifications, setNotifications] = useState([]);
   const [seenAt, setSeenAt] = useState(() => {
     try {
@@ -91,21 +99,20 @@ export default function Layout() {
     .toUpperCase();
 
   const loadNotifications = useCallback(async () => {
-    if (!user?.empId || user?.isSuperAdmin) return;
+    if (!user) return;
     try {
       const { data } = await api.get("/dashboard/notifications");
       setNotifications(data.notifications || []);
     } catch {
       /* ignore poll errors */
     }
-  }, [user?.empId, user?.isSuperAdmin]);
+  }, [user]);
 
   useEffect(() => {
     loadNotifications();
-    if (isAdmin) return undefined;
     const id = setInterval(loadNotifications, 45000);
     return () => clearInterval(id);
-  }, [loadNotifications, isAdmin]);
+  }, [loadNotifications]);
 
   useEffect(() => {
     try {
@@ -161,6 +168,8 @@ export default function Layout() {
                 <CheckCircleOutlined />
               ) : n.type === "leave_rejected" ? (
                 <CloseCircleOutlined />
+              ) : n.type === "leave_request" || n.type === "leave_final" ? (
+                <CalendarOutlined />
               ) : (
                 <NotificationOutlined />
               )}
@@ -168,6 +177,11 @@ export default function Layout() {
             <div>
               <strong>{n.title}</strong>
               <p>{n.body}</p>
+              {n.documentId ? (
+                <button type="button" className="hr-ann-pdf-link" onClick={() => openAnnouncementPdf(n.documentId)}>
+                  Open PDF
+                </button>
+              ) : null}
               <small>{formatNotifTime(n.at)}</small>
             </div>
           </li>
@@ -186,6 +200,15 @@ export default function Layout() {
         { key: "/leave", icon: <CalendarOutlined />, label: "Apply Leave" },
       ],
     },
+  ];
+
+  const hrItems = [
+    { key: "/hr/dashboard", icon: <DashboardOutlined />, label: "HR Dashboard" },
+    { key: "/hr/employees", icon: <TeamOutlined />, label: "Employees" },
+    { key: "/hr/leaves", icon: <CalendarOutlined />, label: "Leave Approvals" },
+    { key: "/hr/attendance", icon: <CheckCircleOutlined />, label: "Attendance" },
+    { key: "/hr/documents", icon: <FileTextOutlined />, label: "Documents" },
+    { key: "/hr/announcements", icon: <NotificationOutlined />, label: "Announcements" },
   ];
 
   const adminItems = [
@@ -210,20 +233,22 @@ export default function Layout() {
 
   const pageLabel = (() => {
     if (PAGE_TITLES[loc.pathname]) return PAGE_TITLES[loc.pathname];
-    if (loc.pathname === "/admin/employees/new") return "Add Employee";
-    if (loc.pathname.startsWith("/admin/employees/")) return "Employee Profile";
-    if (loc.pathname.startsWith("/admin/attendance/")) return "Employee Attendance";
+    if (loc.pathname === "/admin/employees/new" || loc.pathname === "/hr/employees/new") return "Add Employee";
+    if (loc.pathname.startsWith("/admin/employees/") || loc.pathname.startsWith("/hr/employees/")) return "Employee Profile";
+    if (loc.pathname.startsWith("/admin/attendance/") || loc.pathname.startsWith("/hr/attendance/")) return "Employee Attendance";
     return "Dashboard";
   })();
 
   const selectedMenuKey = (() => {
+    if (loc.pathname.startsWith("/hr/employees")) return "/hr/employees";
+    if (loc.pathname.startsWith("/hr/attendance")) return "/hr/attendance";
     if (loc.pathname.startsWith("/admin/employees")) return "/admin/employees";
     if (loc.pathname.startsWith("/admin/attendance")) return "/admin/attendance";
     return loc.pathname;
   })();
 
   const onMenuClick = ({ key }) => {
-    if (READY_ADMIN_ROUTES.has(key) || !isAdmin) {
+    if (READY_ADMIN_ROUTES.has(key) || key.startsWith("/hr/") || !isStaff) {
       navigate(key);
       return;
     }
@@ -250,7 +275,7 @@ export default function Layout() {
         <Avatar size={40} style={{ background: "#2563eb" }}>{initials}</Avatar>
         <div>
           <b>{user?.name || "User"}</b>
-          <small>{isAdmin ? "Super Admin" : `Emp ${user?.empId}`}</small>
+          <small>{isAdmin ? "Super Admin" : isHr ? "Human Resources" : `Emp ${user?.empId}`}</small>
         </div>
       </div>
       <div className="profile-drop-divider" />
@@ -263,15 +288,15 @@ export default function Layout() {
       <Avatar size={36} style={{ background: "#2563eb" }}>{initials}</Avatar>
       <div className="admin-top-user-copy">
         <b>{user?.name || "Admin"}</b>
-        <small>{isAdmin ? "Super Admin" : `Emp ${user?.empId}`}</small>
+        <small>{isAdmin ? "Super Admin" : isHr ? "Human Resources" : `Emp ${user?.empId}`}</small>
       </div>
       <DownOutlined className="admin-top-chevron" />
     </button>
   );
 
   return (
-    <AntLayout className={`softnox-shell${isAdmin ? " admin-shell" : ""}`}>
-      <Sider width={248} className={isAdmin ? "softnox-sider admin-sider" : "softnox-sider"} breakpoint="lg" collapsedWidth={0}>
+    <AntLayout className={`softnox-shell${isStaff ? " admin-shell" : ""}`}>
+      <Sider width={248} className={isStaff ? "softnox-sider admin-sider" : "softnox-sider"} breakpoint="lg" collapsedWidth={0}>
         <div className="sider-logo">
           <div>
             <b>Softnox Technologies</b>
@@ -279,15 +304,15 @@ export default function Layout() {
           </div>
         </div>
         <Menu
-          theme={isAdmin ? "light" : "dark"}
+          theme={isStaff ? "light" : "dark"}
           mode="inline"
           selectedKeys={[selectedMenuKey]}
-          items={isAdmin ? adminItems : employeeItems}
+          items={isHr ? hrItems : isAdmin ? adminItems : employeeItems}
           onClick={onMenuClick}
         />
       </Sider>
       <AntLayout>
-        {isAdmin ? (
+        {isStaff ? (
           <Header className="softnox-header admin-header">
             <Input
               allowClear
@@ -303,17 +328,14 @@ export default function Layout() {
               />
               <Dropdown
                 trigger={["click"]}
-                dropdownRender={() => (
-                  <div className="admin-note-panel">
-                    <b>Notifications</b>
-                    <p>7 leave requests need review</p>
-                    <p>5 attendance corrections pending</p>
-                    <p>3 documents expire this week</p>
-                  </div>
-                )}
+                placement="bottomRight"
+                onOpenChange={(open) => {
+                  if (open) markNotificationsSeen();
+                }}
+                dropdownRender={() => employeeNotifPanel}
               >
-                <button type="button" className="admin-bell has-unread" aria-label="Notifications">
-                  <Badge count={3} size="small" className="admin-bell-badge">
+                <button type="button" className={`admin-bell${unreadCount > 0 ? " has-unread" : ""}`} aria-label="Notifications">
+                  <Badge count={unreadCount} size="small" className="admin-bell-badge" overflowCount={9}>
                     <BellOutlined className="admin-bell-icon" />
                   </Badge>
                 </button>

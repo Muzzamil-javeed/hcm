@@ -11,14 +11,15 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
-  const { user, demoLogin, adminLogin } = useAuth();
+  const { user, demoLogin, adminLogin, hrLogin } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState("employee");
   const qError = new URLSearchParams(window.location.search).get("error");
 
   if (user) {
-    return <Navigate to={user.isSuperAdmin ? "/admin/dashboard" : "/dashboard"} replace />;
+    const home = user.isSuperAdmin ? "/admin/dashboard" : user.isHr ? "/hr/dashboard" : "/dashboard";
+    return <Navigate to={home} replace />;
   }
 
   async function onEmployee(values) {
@@ -28,6 +29,18 @@ export default function Login() {
       await demoLogin(String(values.empId).trim());
     } catch (err) {
       setError(err.response?.data?.message || "Employee login failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onHr(values) {
+    setBusy(true);
+    setError("");
+    try {
+      await hrLogin(values.username, values.password);
+    } catch (err) {
+      setError(err.response?.data?.message || "HR login failed");
     } finally {
       setBusy(false);
     }
@@ -56,7 +69,7 @@ export default function Login() {
         <div className="auth-hero-glow auth-hero-glow-c" />
         <div className="auth-hero-card auth-enter">
           <p className="auth-hero-kicker">Softnox Technologies</p>
-          <h1>Empowering people through seamless HR management.</h1>
+          <h1>Human Resource Management (HRM) <br/ > Portal System</h1>
           <div className="auth-hero-visual" aria-hidden>
             <div className="auth-people">
               <span className="p1" />
@@ -124,6 +137,28 @@ export default function Login() {
                         Forgot Password?
                       </button>
                     </div>
+                    <Button block size="large" type="primary" htmlType="submit" loading={busy} className="auth-submit">
+                      Sign In
+                    </Button>
+                  </Form>
+                ),
+              },
+              {
+                key: "hr",
+                label: "HR",
+                children: (
+                  <Form layout="vertical" onFinish={onHr} initialValues={{ username: "hr", remember: true }} className="auth-form">
+                    <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+                      <Input size="large" placeholder="hr" suffix={<MailOutlined className="auth-field-icon" />} />
+                    </Form.Item>
+                    <Form.Item name="password" label="Password" rules={[{ required: true }]}>
+                      <Input.Password
+                        size="large"
+                        placeholder="Password"
+                        iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+                        prefix={<LockOutlined className="auth-field-icon" />}
+                      />
+                    </Form.Item>
                     <Button block size="large" type="primary" htmlType="submit" loading={busy} className="auth-submit">
                       Sign In
                     </Button>

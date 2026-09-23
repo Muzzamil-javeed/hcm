@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   App as AntApp,
   Avatar,
@@ -79,6 +80,8 @@ function formatAssigned(iso) {
 export default function AdminEmployeeProfile() {
   const { empId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const base = user?.isHr ? "/hr" : "/admin";
   const { message } = AntApp.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -115,7 +118,7 @@ export default function AdminEmployeeProfile() {
   if (!emp) {
     return (
       <div className="emp-profile-page">
-        <button type="button" className="ad-link" onClick={() => navigate("/admin/employees")}>
+        <button type="button" className="ad-link" onClick={() => navigate(`${base}/employees`)}>
           ← Back to Employees
         </button>
         <p className="muted">Employee not found.</p>
@@ -126,7 +129,7 @@ export default function AdminEmployeeProfile() {
   return (
     <div className="emp-profile-page">
       <div className="emp-profile-crumb">
-        <button type="button" className="crumb-back" onClick={() => navigate("/admin/employees")}>
+        <button type="button" className="crumb-back" onClick={() => navigate(`${base}/employees`)}>
           <ArrowLeftOutlined /> Employees
         </button>
         <span>/</span>
@@ -159,7 +162,7 @@ export default function AdminEmployeeProfile() {
           </div>
 
           <div className="emp-profile-actions">
-            <Link className="emp-btn primary" to={`/admin/attendance/${emp.empId}`}>
+            <Link className="emp-btn primary" to={`${base}/attendance/${emp.empId}`}>
               <ClockCircleOutlined /> View Attendance
             </Link>
             <a className="emp-btn ghost" href={emp.email ? `mailto:${emp.email}` : undefined}>
@@ -171,8 +174,8 @@ export default function AdminEmployeeProfile() {
             <header>
               <h4>Basic information</h4>
             </header>
-            <InfoRow label="Phone" value={emp.mobile} />
-            <InfoRow label="Email" value={emp.email} />
+            <InfoRow label="Phone" value={(emp.mobiles || []).map((row) => row.value).filter(Boolean).join(", ") || emp.mobile} />
+            <InfoRow label="Email" value={(emp.emails || []).map((row) => row.value).filter(Boolean).join(", ") || emp.email} />
             <InfoRow label="Gender" value={emp.gender} />
             <InfoRow label="Birthday" value={emp.dateOfBirth} />
             <InfoRow label="Department" value={emp.department} />
@@ -190,6 +193,12 @@ export default function AdminEmployeeProfile() {
             <InfoRow label="Marital Status" value={emp.maritalStatus} />
             <InfoRow label="Full Department" value={emp.departmentFull} />
             <InfoRow label="Role" value={emp.role} />
+            {(emp.documentItems || []).map((doc) => (
+              <InfoRow key={doc.name} label={doc.name} value={doc.received ? "Received" : "Not received"} />
+            ))}
+            {(emp.extraFields || []).map((field) => (
+              <InfoRow key={field.label} label={field.label} value={field.value} />
+            ))}
           </section>
 
           <section className="emp-profile-block">

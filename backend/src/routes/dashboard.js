@@ -3,7 +3,12 @@ import { Employee } from "../models/Employee.js";
 import { AttendanceLog } from "../models/AttendanceLog.js";
 import { LeaveRequest } from "../models/LeaveRequest.js";
 import { LeaveBalance } from "../models/LeaveBalance.js";
-import { Announcement } from "../models/Announcement.js";
+import {
+  Announcement,
+  activeWindowFilter,
+  announcementNotifAt,
+  purgeExpiredAnnouncements,
+} from "../models/Announcement.js";
 import { authRequired } from "../middleware/auth.js";
 import {
   addDays,
@@ -125,8 +130,10 @@ router.get("/summary", authRequired, async (req, res) => {
 
   const teamName = employee?.team || "General";
   const reportsToName = String(employee?.reportsTo || "").trim();
+  const annToday = await purgeExpiredAnnouncements();
   const [announcements, teamMembers, managerByName] = await Promise.all([
-    Announcement.find({ audience: { $in: ["all", "employees"] } })
+    Announcement.find({ audience: { $in: ["all", "employees"] }, ...activeWindowFilter(annToday) })
+      .select("-documentData")
       .sort({ createdAt: -1 })
       .limit(8)
       .lean(),
@@ -223,6 +230,7 @@ router.get("/summary", authRequired, async (req, res) => {
       audience: a.audience,
       createdBy: a.createdBy,
       createdAt: a.createdAt,
+      documentName: a.documentName || "",
     })),
     team: {
       name: teamName,
@@ -299,19 +307,75 @@ router.get("/profile", authRequired, async (req, res) => {
   });
 });
 
+router.get("/announcements/:id/document", authRequired, async (req, res) => {
+  const row = await Announcement.findById(req.params.id).select("documentName documentData audience");
+  if (!row?.documentData) return res.status(404).json({ message: "No document on this announcement" });
+  const role = req.user.role;
+  const staff = role === "hr" || role === "admin";
+  if (!staff && !["all", "employees"].includes(row.audience)) {
+    return res.status(403).json({ message: "You cannot open this document" });
+  }
+  res.json({ name: row.documentName || "policy.pdf", data: row.documentData });
+});
+
 router.get("/notifications", authRequired, async (req, res) => {
   const empId = req.user.empId;
-  if (!empId || empId === "ADMIN") {
-    return res.json({ notifications: [], unread: 0 });
+  const role = req.user.role;
+  const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+
+  const today = await purgeExpiredAnnouncements();
+
+  if (role === "hr" || role === "admin") {
+    const leaveFilter = role === "hr"
+      ? { status: "pending", createdAt: { $gte: since } }
+      : { status: "hr_approved", updatedAt: { $gte: since } };
+    const [leaveRows, announcements] = await Promise.all([
+      LeaveRequest.find(leaveFilter).sort({ createdAt: -1 }).limit(12).lean(),
+      Announcement.find(activeWindowFilter(today)).select("-documentData").sort({ createdAt: -1 }).limit(8).lean(),
+    ]);
+    const empIds = [...new Set(leaveRows.map((l) => l.empId))];
+    const people = await Employee.find({ empId: { $in: empIds } }).select("empId name").lean();
+    const names = new Map(people.map((p) => [p.empId, p.name]));
+    const notifications = [
+      ...leaveRows.map((l) => {
+        const who = names.get(l.empId) || `Employee ${l.empId}`;
+        const typeLabel = String(l.type || "leave").replace(/^\w/, (c) => c.toUpperCase());
+        const forHr = role === "hr";
+        return {
+          id: `leave-${l._id}`,
+          type: forHr ? "leave_request" : "leave_final",
+          tone: "amber",
+          title: forHr ? "New leave request" : "Leave waiting for final approval",
+          body: `${who} asked for ${typeLabel} leave (${l.fromDate} → ${l.toDate}, ${l.days} day(s)).`,
+          at: forHr ? l.createdAt : l.updatedAt || l.createdAt,
+        };
+      }),
+      ...announcements.map((a) => ({
+        id: `ann-${a._id}`,
+        type: "announcement",
+        tone: "blue",
+        title: a.title || "Announcement",
+        body: a.documentName ? `${a.body || ""} PDF: ${a.documentName}`.trim() : (a.body || ""),
+        documentId: a.documentName ? String(a._id) : "",
+        at: announcementNotifAt(a),
+      })),
+    ]
+      .sort((a, b) => new Date(b.at) - new Date(a.at))
+      .slice(0, 20)
+      .map((n) => ({ ...n, at: n.at ? new Date(n.at).toISOString() : null }));
+    return res.json({ notifications });
   }
 
-  const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+  if (!empId) {
+    return res.json({ notifications: [], unread: 0 });
+  }
 
   const [announcements, leaveDecisions] = await Promise.all([
     Announcement.find({
       audience: { $in: ["all", "employees"] },
-      createdAt: { $gte: since },
+      ...activeWindowFilter(today),
     })
+      .select("-documentData")
       .sort({ createdAt: -1 })
       .limit(12)
       .lean(),
@@ -331,8 +395,11 @@ router.get("/notifications", authRequired, async (req, res) => {
       type: "announcement",
       tone: "blue",
       title: a.title || "New announcement",
-      body: a.body || "A new Softnox announcement was posted.",
-      at: a.createdAt,
+      body: a.documentName
+        ? `${a.body || "A new Softnox announcement was posted."} PDF: ${a.documentName}`
+        : (a.body || "A new Softnox announcement was posted."),
+      documentId: a.documentName ? String(a._id) : "",
+      at: announcementNotifAt(a),
     })),
     ...leaveDecisions.map((l) => {
       const approved = l.status === "approved";

@@ -1,4 +1,0 @@
-backend/data/mongo
-**/.cache
-**/mongodb-binaries
-frontend/.vercel

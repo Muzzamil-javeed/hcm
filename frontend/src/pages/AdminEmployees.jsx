@@ -24,6 +24,7 @@ import {
 } from "@ant-design/icons";
 import api from "../api";
 import AdminPage from "../components/AdminPage";
+import { useAuth } from "../context/AuthContext";
 
 function initials(name = "") {
   return name
@@ -96,6 +97,9 @@ function EmpCard({ emp, onOpen }) {
 
 export default function AdminEmployees() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const base = user?.isHr ? "/hr" : "/admin";
+  const canAdd = Boolean(user?.isHr);
   const { message } = AntApp.useApp();
   const [rows, setRows] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -107,7 +111,7 @@ export default function AdminEmployees() {
   const [view, setView] = useState("cards");
 
   function openProfile(emp) {
-    navigate(`/admin/employees/${emp.empId}`);
+    navigate(`${base}/employees/${emp.empId}`);
   }
 
   async function load() {
@@ -187,9 +191,11 @@ export default function AdminEmployees() {
       subtitle={`${rows.length} Softnox employees · click anyone for full profile`}
       extra={
         <Space wrap>
-          <Button type="primary" icon={<UserAddOutlined />} onClick={() => navigate("/admin/employees/new")}>
-            Add Employee
-          </Button>
+          {canAdd ? (
+            <Button type="primary" icon={<UserAddOutlined />} onClick={() => navigate(`${base}/employees/new`)}>
+              Add Employee
+            </Button>
+          ) : null}
           <Segmented
             value={view}
             onChange={setView}

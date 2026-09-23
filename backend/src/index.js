@@ -21,7 +21,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 app.use(cookieParser());
 app.use(
   session({
@@ -78,20 +78,18 @@ process.on("unhandledRejection", (err) => {
   console.error("unhandledRejection", err);
 });
 
-if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`Flow HCM API running on http://localhost:${PORT}`);
-  });
+app.listen(PORT, () => {
+  console.log(`Flow HCM API running on http://localhost:${PORT}`);
+});
 
-  if (process.env.ZK_AUTO_SYNC !== "false") {
-    const minutes = Number(process.env.ZK_SYNC_MINUTES) || 3;
-    setTimeout(() => {
-      syncMachines()
-        .then((r) => console.log("ZK first sync", JSON.stringify(r.machines.map((m) => ({ id: m.id, ok: m.ok, logs: m.logs, error: m.error })))))
-        .catch((err) => console.error("ZK first sync failed", err.message));
-    }, 4000);
-    setInterval(() => {
-      syncMachines().catch((err) => console.error("ZK sync failed", err.message));
-    }, minutes * 60 * 1000);
-  }
+if (process.env.ZK_AUTO_SYNC !== "false") {
+  const minutes = Number(process.env.ZK_SYNC_MINUTES) || 3;
+  setTimeout(() => {
+    syncMachines()
+      .then((r) => console.log("ZK first sync", JSON.stringify(r.machines.map((m) => ({ id: m.id, ok: m.ok, logs: m.logs, error: m.error })))))
+      .catch((err) => console.error("ZK first sync failed", err.message));
+  }, 4000);
+  setInterval(() => {
+    syncMachines().catch((err) => console.error("ZK sync failed", err.message));
+  }, minutes * 60 * 1000);
 }

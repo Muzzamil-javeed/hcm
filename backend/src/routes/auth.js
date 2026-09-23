@@ -138,6 +138,33 @@ router.post("/admin", async (req, res) => {
   res.json({ token, user: publicUser(user, null) });
 });
 
+router.post("/hr", async (req, res) => {
+  const username = String(req.body?.username || "").trim();
+  const password = String(req.body?.password || "");
+  const hrUser = process.env.HR_USERNAME || "hr";
+  const hrPass = process.env.HR_PASSWORD || "Hr@123";
+  if (username.toLowerCase() !== hrUser.toLowerCase() || password !== hrPass) {
+    return res.status(401).json({ message: "Invalid HR username or password" });
+  }
+  let user = await User.findOne({ email: "hr@flowhcm.local" });
+  if (!user) {
+    user = await User.create({
+      email: "hr@flowhcm.local",
+      name: "HR",
+      empId: "HR",
+      role: "hr",
+    });
+  } else {
+    user.name = "HR";
+    user.empId = "HR";
+    user.role = "hr";
+    await user.save();
+  }
+  const token = signToken(user);
+  setAuthCookie(res, token);
+  res.json({ token, user: publicUser(user, null) });
+});
+
 router.post("/demo", async (req, res) => {
   const empId = String(req.body?.empId || "").trim();
   if (!empId) {
@@ -194,17 +221,19 @@ router.post("/logout", (_req, res) => {
 });
 
 function publicUser(user, employee) {
-  const isSuperAdmin = user.role === "admin" && user.empId === "ADMIN";
+  const isSuperAdmin = user.role === "admin";
+  const isHr = user.role === "hr";
   return {
     id: user._id,
-    name: isSuperAdmin ? "Super Admin" : employee?.name || user.name,
+    name: isSuperAdmin ? "Super Admin" : isHr ? "HR" : employee?.name || user.name,
     email: user.email,
     picture: user.picture || employee?.avatar,
     empId: user.empId,
-    jobTitle: isSuperAdmin ? "Super Admin" : employee?.jobTitle || "Employee",
-    department: isSuperAdmin ? "Administration" : employee?.department || "Operations",
+    jobTitle: isSuperAdmin ? "Super Admin" : isHr ? "Human Resources" : employee?.jobTitle || "Employee",
+    department: isSuperAdmin || isHr ? "Administration" : employee?.department || "Operations",
     role: user.role,
     isSuperAdmin,
+    isHr,
   };
 }
 

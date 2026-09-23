@@ -52,6 +52,7 @@ export default function ApplyLeave() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState(null);
 
   const fromDate = Form.useWatch("fromDate", form);
   const toDate = Form.useWatch("toDate", form);
@@ -89,6 +90,8 @@ export default function ApplyLeave() {
         fromDate: values.fromDate.format("YYYY-MM-DD"),
         toDate: values.toDate.format("YYYY-MM-DD"),
         reason: values.reason || "",
+        attachmentName: file?.name || "",
+        attachmentData: file?.data || "",
       });
       message.success("Leave request submitted");
       form.resetFields();
@@ -98,6 +101,7 @@ export default function ApplyLeave() {
         toDate: dayjs(),
       });
       setFileName("");
+      setFile(null);
       await load();
     } catch (err) {
       message.error(err.response?.data?.message || "Could not apply leave");
@@ -238,9 +242,17 @@ export default function ApplyLeave() {
               <span>Attachment</span>
               <div className="al-attach-row">
                 <Upload
-                  beforeUpload={(file) => {
-                    setFileName(file.name);
-                    message.info("Attachment noted locally — file upload comes in a later release");
+                  beforeUpload={(picked) => {
+                    if (picked.size > 1.5 * 1024 * 1024) {
+                      message.error("Document must be under 1.5 MB");
+                      return false;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setFile({ name: picked.name, data: String(reader.result || "") });
+                      setFileName(picked.name);
+                    };
+                    reader.readAsDataURL(picked);
                     return false;
                   }}
                   showUploadList={false}
@@ -295,7 +307,11 @@ export default function ApplyLeave() {
               {
                 title: "Status",
                 dataIndex: "status",
-                render: (s) => <Tag className={`al-status ${s}`}>{s}</Tag>,
+                render: (s) => (
+                  <Tag className={`al-status ${s}`}>
+                    {s === "hr_approved" ? "With Admin" : s === "pending" ? "With HR" : s}
+                  </Tag>
+                ),
               },
             ]}
           />

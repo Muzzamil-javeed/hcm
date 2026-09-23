@@ -27,6 +27,7 @@ import {
 import dayjs from "dayjs";
 import api from "../api";
 import AdminPage from "../components/AdminPage";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS_COLOR = {
   Present: "success",
@@ -103,6 +104,8 @@ function AttCard({ row, onClick }) {
 
 export default function AdminAttendance() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const base = user?.isHr ? "/hr" : "/admin";
   const { message } = AntApp.useApp();
   const [date, setDate] = useState(dayjs());
   const [rows, setRows] = useState([]);
@@ -117,7 +120,7 @@ export default function AdminAttendance() {
   const dateStr = date.format("YYYY-MM-DD");
 
   function goFullAttendance(empId) {
-    navigate(`/admin/attendance/${empId}`);
+    navigate(`${base}/attendance/${empId}`);
   }
 
   async function loadOverview() {
@@ -402,7 +405,7 @@ export default function AdminAttendance() {
                 onClick={() => {
                   const id = modalEmp.empId;
                   setModalEmp(null);
-                  navigate(`/admin/employees/${id}`);
+                  navigate(`${base}/employees/${id}`);
                 }}
               >
                 <TeamOutlined /> Employee Profile

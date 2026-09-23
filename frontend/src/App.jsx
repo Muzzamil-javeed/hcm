@@ -25,6 +25,7 @@ import AdminRoles from "./pages/AdminRoles";
 import AdminAudit from "./pages/AdminAudit";
 import AdminDevices from "./pages/AdminDevices";
 import AuthCallback from "./pages/AuthCallback";
+import HrDashboard from "./pages/HrDashboard";
 
 function Guard({ children }) {
   const { user, loading } = useAuth();
@@ -41,13 +42,20 @@ function Guard({ children }) {
 
 function AdminGuard({ children }) {
   const { user } = useAuth();
-  if (!user?.isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  if (!user?.isSuperAdmin) return <Navigate to={user?.isHr ? "/hr/dashboard" : "/dashboard"} replace />;
+  return children;
+}
+
+function HrGuard({ children }) {
+  const { user } = useAuth();
+  if (!user?.isHr) return <Navigate to={user?.isSuperAdmin ? "/admin/dashboard" : "/dashboard"} replace />;
   return children;
 }
 
 function EmployeeGuard({ children }) {
   const { user } = useAuth();
   if (user?.isSuperAdmin) return <Navigate to="/admin/dashboard" replace />;
+  if (user?.isHr) return <Navigate to="/hr/dashboard" replace />;
   return children;
 }
 
@@ -123,6 +131,15 @@ export default function App() {
         <Route path="admin/roles" element={<AdminRoute><AdminRoles /></AdminRoute>} />
         <Route path="admin/audit" element={<AdminRoute><AdminAudit /></AdminRoute>} />
         <Route path="admin/devices" element={<AdminRoute><AdminDevices /></AdminRoute>} />
+        <Route path="hr/dashboard" element={<HrGuard><HrDashboard /></HrGuard>} />
+        <Route path="hr/employees" element={<HrGuard><AdminEmployees /></HrGuard>} />
+        <Route path="hr/employees/new" element={<HrGuard><AdminEmployeeCreate /></HrGuard>} />
+        <Route path="hr/employees/:empId" element={<HrGuard><AdminEmployeeProfile /></HrGuard>} />
+        <Route path="hr/leaves" element={<HrGuard><AdminLeaves /></HrGuard>} />
+        <Route path="hr/documents" element={<HrGuard><AdminDocuments /></HrGuard>} />
+        <Route path="hr/attendance" element={<HrGuard><AdminAttendance /></HrGuard>} />
+        <Route path="hr/attendance/:empId" element={<HrGuard><AdminEmployeeAttendance /></HrGuard>} />
+        <Route path="hr/announcements" element={<HrGuard><AdminAnnouncements /></HrGuard>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
