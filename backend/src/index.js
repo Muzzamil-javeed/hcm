@@ -13,7 +13,7 @@ import adminRoutes from "./routes/admin.js";
 import { syncMachines } from "./services/zkMachines.js";
 
 const app = express();
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = Number(process.env.PORT) || 5050;
 
 app.use(
   cors({

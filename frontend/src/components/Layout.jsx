@@ -296,7 +296,7 @@ export default function Layout() {
 
   return (
     <AntLayout className={`softnox-shell${isStaff ? " admin-shell" : ""}`}>
-      <Sider width={248} className={isStaff ? "softnox-sider admin-sider" : "softnox-sider"} breakpoint="lg" collapsedWidth={0}>
+      <Sider width={248} className="softnox-sider admin-sider" breakpoint="lg" collapsedWidth={0}>
         <div className="sider-logo">
           <div>
             <b>Softnox Technologies</b>
@@ -304,7 +304,7 @@ export default function Layout() {
           </div>
         </div>
         <Menu
-          theme={isStaff ? "light" : "dark"}
+          theme="light"
           mode="inline"
           selectedKeys={[selectedMenuKey]}
           items={isHr ? hrItems : isAdmin ? adminItems : employeeItems}
